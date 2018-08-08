@@ -11,7 +11,14 @@ The engine is comprised mostly of external libraries.
 
 ### Native
 
-You're on your own.
+Should build perfectly fine with minimal configuration and a C++17 compiler.
+
+Dependencies:
+
+- `SDL2`
+- `freetype2`
+- `libpng`
+- `zlib`
 
 ### Emscripten
 
