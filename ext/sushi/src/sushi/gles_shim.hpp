@@ -1,0 +1,12 @@
+#ifndef SUSHI_GLES_SHIM_HPP
+#define SUSHI_GLES_SHIM_HPP
+
+#define GL_TEXTURE_WRAP_R GL_TEXTURE_WRAP_R_OES
+#define GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS_EXT GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS
+
+#define glDrawBuffers glDrawBuffersEXT
+#define glGenVertexArrays glGenVertexArraysOES
+#define glDeleteVertexArrays glDeleteVertexArraysOES
+#define glBindVertexArray glBindVertexArrayOES
+
+#endif //SUSHI_GLES_SHIM_HPP

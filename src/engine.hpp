@@ -1,0 +1,5 @@
+#ifndef LD42_ENGINE_HPP
+#define LD42_ENGINE_HPP
+
+
+#endif // LD42_ENGINE_HPP

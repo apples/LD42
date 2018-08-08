@@ -1,0 +1,16 @@
+[submodule "lodepng"]
+	path = lodepng
+	url = https://github.com/dbralir/lodepng
+	branch = cmake
+[submodule "glad"]
+	path = glad
+	url = https://github.com/dbralir/glad
+	branch = cmake
+[submodule "glm"]
+	path = glm
+	url = https://github.com/g-truc/glm
+	branch = master
+[submodule "glfw"]
+	path = glfw
+	url = https://github.com/glfw/glfw
+	branch = master

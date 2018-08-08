@@ -1,0 +1,11 @@
+/*
+!data
+!data_src
+!ext
+!src
+!emberjs_shim_src
+!static
+!.gitignore
+!CMakeLists.txt
+!README.md
+!.clang-format
