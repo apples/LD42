@@ -13,6 +13,8 @@ The engine is comprised mostly of external libraries.
 
 Should build perfectly fine with minimal configuration and a C++17 compiler.
 
+Does not build in Visual Studio.
+
 Dependencies:
 
 - `SDL2`
