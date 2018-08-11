@@ -16,6 +16,13 @@ public:
     template <typename F>
     using require_is_not_factory = std::enable_if_t<!std::is_convertible<std::decay_t<F>, factory_function>::value>*;
 
+    resource_cache() = default;
+    resource_cache(const resource_cache&) = delete;
+    resource_cache(resource_cache&) = delete;
+    resource_cache(resource_cache&&) = default;
+    resource_cache& operator=(const resource_cache&) = delete;
+    resource_cache& operator=(resource_cache&&) = default;
+
     resource_cache(factory_function f) : factory(std::move(f)) {}
 
     template <typename F>

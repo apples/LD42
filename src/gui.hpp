@@ -64,6 +64,7 @@ std::vector<gui::widget*> get_descendent_stack(gui::widget& widget, glm::vec2 po
 
 class screen : public widget {
 public:
+    screen() : screen(glm::vec2{0, 0}) {}
     screen(const glm::vec2& screen_size);
 
     virtual glm::vec2 get_size() const override;

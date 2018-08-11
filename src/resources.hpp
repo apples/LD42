@@ -14,6 +14,12 @@
 
 class resource_manager {
 public:
+    resource_manager() = default;
+    resource_manager(const resource_manager&) = delete;
+    resource_manager(resource_manager&&) = default;
+    resource_manager& operator=(const resource_manager&) = delete;
+    resource_manager& operator=(resource_manager&&) = default;
+
     resource_manager(nlohmann::json& config, sol::state& lua);
 
     resource_cache<sushi::static_mesh> mesh_cache;
