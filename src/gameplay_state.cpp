@@ -17,15 +17,9 @@ void gameplay_state(ld42_engine& engine, double delta) {
 
     // Update
 
-    systems::movement(engine.entities, delta);
-    systems::collision(engine.entities, delta, engine.resources);
-    systems::scripting(engine.entities, delta, engine.resources);
-    systems::death_timer(engine.entities, delta, engine.resources);
-
-    // Render
-
-    auto proj = glm::ortho(-7.5f * engine.aspect_ratio, 7.5f * engine.aspect_ratio, -7.5f, 7.5f, 7.5f, -7.5f);
-    auto view = glm::mat4(1.f);
-
-    systems::render(engine.entities, delta, proj, view, engine.sprite_mesh, engine.resources);
+    systems::movement(engine, delta);
+    systems::collision(engine, delta);
+    systems::scripting(engine, delta);
+    systems::death_timer(engine, delta);
+    systems::render(engine, delta);
 }

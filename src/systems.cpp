@@ -2,20 +2,26 @@
 
 #include "components.hpp"
 
+#include <glm/glm.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <sushi/frustum.hpp>
 #include <sushi/shader.hpp>
+#include <sushi/texture.hpp>
+#include <sushi/mesh.hpp>
+#include <sol.hpp>
 
 namespace systems {
 
-void movement(DB& entities, double delta) {
-    entities.visit([&](component::position& pos, const component::velocity& vel) {
+void movement(ld42_engine& engine, double delta) {
+    engine.entities.visit([&](component::position& pos, const component::velocity& vel) {
         pos.x += vel.vx * delta;
         pos.y += vel.vy * delta;
     });
 }
 
-void collision(DB& entities, double delta, resource_manager& resources) {
+void collision(ld42_engine& engine, double delta) {
+    using DB = ember_database;
+
     struct entity_info {
         DB::ent_id eid;
         component::aabb aabb;
@@ -39,11 +45,11 @@ void collision(DB& entities, double delta, resource_manager& resources) {
     std::vector<const entity_info*> axis_list;
     std::vector<collision_manifold> collisions;
 
-    world.reserve(entities.size());
-    axis_list.reserve(entities.size());
+    world.reserve(engine.entities.size());
+    axis_list.reserve(engine.entities.size());
 
     // Create world list
-    entities.visit([&](DB::ent_id eid, const component::position& pos, const component::aabb& aabb) {
+    engine.entities.visit([&](DB::ent_id eid, const component::position& pos, const component::aabb& aabb) {
         auto info = entity_info{};
         info.eid = eid;
         info.aabb.left = pos.x + aabb.left;
@@ -86,9 +92,9 @@ void collision(DB& entities, double delta, resource_manager& resources) {
     // Call handlers
     for (auto& collision : collisions) {
         auto call_script = [&](DB::ent_id eid1, DB::ent_id eid2, const component::aabb& aabb) {
-            if (entities.has_component<component::script>(eid1)) {
-                auto& script = entities.get_component<component::script>(eid1);
-                auto script_ptr = resources.environment_cache.get(script.name);
+            if (engine.entities.has_component<component::script>(eid1)) {
+                auto& script = engine.entities.get_component<component::script>(eid1);
+                auto script_ptr = engine.resources.environment_cache.get(script.name);
                 auto on_collide = (*script_ptr)["on_collide"];
                 if (on_collide.valid()) {
                     on_collide(eid1, eid2, aabb);
@@ -100,39 +106,43 @@ void collision(DB& entities, double delta, resource_manager& resources) {
     }
 }
 
-void scripting(DB& entities, double delta, resource_manager& resources) {
-    entities.visit([&](DB::ent_id eid, const component::script& script) {
-        auto update = (*resources.environment_cache.get(script.name))["update"];
+void scripting(ld42_engine& engine, double delta) {
+    using DB = ember_database;
+    engine.entities.visit([&](DB::ent_id eid, const component::script& script) {
+        auto update = (*engine.resources.environment_cache.get(script.name))["update"];
         if (update.valid()) {
             update(eid, delta);
         }
     });
 }
 
-void death_timer(DB& entities, double delta, resource_manager& resources) {
-    // Death timer system
-    entities.visit([&](DB::ent_id eid) {
-        if (entities.has_component<component::death_timer>(eid)) {
-            auto& timer = entities.get_component<component::death_timer>(eid);
+void death_timer(ld42_engine& engine, double delta) {
+    using DB = ember_database;
+    engine.entities.visit([&](DB::ent_id eid) {
+        if (engine.entities.has_component<component::death_timer>(eid)) {
+            auto& timer = engine.entities.get_component<component::death_timer>(eid);
             timer.time -= delta;
             if (timer.time <= 0) {
-                if (entities.has_component<component::script>(eid)) {
-                    auto& script = entities.get_component<component::script>(eid);
-                    auto env_ptr = resources.environment_cache.get(script.name);
+                if (engine.entities.has_component<component::script>(eid)) {
+                    auto& script = engine.entities.get_component<component::script>(eid);
+                    auto env_ptr = engine.resources.environment_cache.get(script.name);
                     auto on_death = (*env_ptr)["on_death"];
                     if (on_death.valid()) {
                         on_death(eid);
                     }
                 }
-                entities.destroy_entity(eid);
+                engine.entities.destroy_entity(eid);
             }
         }
     });
 }
 
-void render(DB& entities, double delta, glm::mat4 proj, glm::mat4 view, sushi::static_mesh& sprite_mesh, resource_manager& resources) {
+void render(ld42_engine& engine, double delta) {
+    using DB = ember_database;
+    auto proj = glm::ortho(-7.5f * engine.aspect_ratio, 7.5f * engine.aspect_ratio, -7.5f, 7.5f, 7.5f, -7.5f);
+    auto view = glm::mat4(1.f);
     auto frustum = sushi::frustum(proj * view);
-    entities.visit([&](DB::ent_id eid, const component::position& pos, component::animation& anim) {
+    engine.entities.visit([&](DB::ent_id eid, const component::position& pos, component::animation& anim) {
         if (frustum.contains({pos.x, pos.y, 0.f}, std::sqrt(0.5 * 0.5 * 2.f))) {
             auto modelmat = glm::mat4(1);
             modelmat = glm::translate(modelmat, {int(pos.x * 16) / 16.f, int(pos.y * 16) / 16.f, 0});
@@ -144,7 +154,7 @@ void render(DB& entities, double delta, glm::mat4 proj, glm::mat4 view, sushi::s
             auto tint = glm::vec4{1, 1, 1, 1};
 
             // animation code
-            auto jsonAnim = *resources.animation_cache.get(anim.name);
+            auto jsonAnim = *engine.resources.animation_cache.get(anim.name);
             auto tMilliSecond = float(jsonAnim[anim.cycle]["frame"][anim.frame]["t"]) / 1000.f;
             anim.t += delta / 10;
             if (anim.t > tMilliSecond) {
@@ -154,11 +164,11 @@ void render(DB& entities, double delta, glm::mat4 proj, glm::mat4 view, sushi::s
             }
             auto pathToTexture = jsonAnim[anim.cycle]["frame"][anim.frame]["path"];
 
-            sushi::set_texture(0, *resources.texture_cache.get(pathToTexture));
+            sushi::set_texture(0, *engine.resources.texture_cache.get(pathToTexture));
             sushi::set_uniform("normal_mat", glm::inverseTranspose(view * modelmat));
             sushi::set_uniform("MVP", (proj * view * modelmat));
             sushi::set_uniform("tint", tint);
-            sushi::draw_mesh(sprite_mesh);
+            sushi::draw_mesh(engine.sprite_mesh);
         }
     });
 }
