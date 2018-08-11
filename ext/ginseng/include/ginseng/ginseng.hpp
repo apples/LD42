@@ -13,6 +13,20 @@ namespace ginseng {
 
 namespace _detail {
 
+// Find Type
+
+template <typename T, typename... Ts>
+struct index_of;
+
+template <typename T, typename... Ts>
+constexpr auto index_of_v = index_of<T, Ts...>::value;
+
+template <typename T, typename... Ts>
+struct index_of<T, T, Ts...> : std::integral_constant<std::size_t, 0> {};
+
+template <typename T, typename U, typename... Ts>
+struct index_of<T, U, Ts...> : std::integral_constant<std::size_t, 1 + index_of_v<T, Ts...>> {};
+
 // Type Guid
 
 using type_guid = std::size_t;
@@ -23,16 +37,9 @@ inline type_guid get_next_type_guid() noexcept {
 }
 
 template <typename T>
-struct type_guid_trait {
-    static const type_guid value;
-};
-
-template <typename T>
-const type_guid type_guid_trait<T>::value = get_next_type_guid();
-
-template <typename T>
 type_guid get_type_guid() {
-    return type_guid_trait<T>::value;
+    static const type_guid my_guid = get_next_type_guid();
+    return my_guid;
 }
 
 // Dynamic Bitset
@@ -44,7 +51,7 @@ public:
     static constexpr size_type word_size = 64;
 
     using bitset = std::bitset<word_size>;
-    using bitset_array = std::unique_ptr<bitset[]>;
+    using bitset_array = bitset*;
 
     dynamic_bitset()
         : sdo(0), numbits(word_size) {}
@@ -52,43 +59,40 @@ public:
     dynamic_bitset(const dynamic_bitset&) = delete;
     dynamic_bitset& operator=(const dynamic_bitset&) = delete;
 
-    dynamic_bitset(dynamic_bitset&& other)
-        : sdo(0), numbits(word_size) {
-        if (other.numbits == word_size) {
-            sdo = other.sdo;
+    dynamic_bitset(dynamic_bitset&& other) {
+        if (other.using_sdo()) {
+            new (&sdo) bitset(std::move(other.sdo));
+            numbits = other.numbits;
         } else {
-            sdo.~bitset();
-            new (&dyna) bitset_array(std::move(other.dyna));
-            other.dyna.~unique_ptr();
+            dyna = other.dyna;
             numbits = other.numbits;
             other.numbits = word_size;
-            other.sdo = 0;
+            new (&other.sdo) bitset(0);
         }
     }
 
     dynamic_bitset& operator=(dynamic_bitset&& other) {
-        if (numbits == word_size) {
-            sdo.~bitset<word_size>();
+        if (using_sdo()) {
+            sdo.~bitset();
         } else {
-            dyna.~unique_ptr();
+            delete[] dyna;
         }
-        if (other.numbits == word_size) {
-            sdo = other.sdo;
+        if (other.using_sdo()) {
+            new (&sdo) bitset(std::move(other.sdo));
         } else {
-            new (&dyna) bitset_array(std::move(other.dyna));
-            other.dyna.~unique_ptr();
+            dyna = other.dyna;
         }
         numbits = other.numbits;
-        other.sdo = 0;
+        new (&other.sdo) bitset(0);
         other.numbits = word_size;
         return *this;
     }
 
     ~dynamic_bitset() {
-        if (numbits == word_size) {
+        if (using_sdo()) {
             sdo.~bitset();
         } else {
-            dyna.~unique_ptr();
+            delete[] dyna;
         }
     }
 
@@ -96,58 +100,55 @@ public:
         return numbits;
     }
 
-    void resize(size_type ns) {
-        if (ns > numbits) {
-            auto count = (ns + word_size - 1u) / word_size;
+    bool using_sdo() const {
+        return numbits == word_size;
+    }
+
+    void resize(size_type i) {
+        if (i > numbits) {
+            auto count = (i + word_size - 1) / word_size;
+            auto newptr = new bitset[count];
             auto newlen = count * word_size;
-            auto newptr = std::make_unique<bitset[]>(count);
-            if (numbits == word_size) {
-                newptr[0] = sdo;
+            auto bitarr = using_sdo() ? &sdo : dyna;
+            std::copy(bitarr, bitarr + (numbits / word_size), newptr);
+            if (using_sdo()) {
                 sdo.~bitset();
-                new (&dyna) bitset_array(std::move(newptr));
             } else {
-                copy(dyna.get(), dyna.get() + (numbits / word_size), newptr.get());
-                std::fill(newptr.get() + (numbits / word_size), newptr.get() + (newlen / word_size), 0);
-                dyna = std::move(newptr);
+                delete[] dyna;
             }
+            dyna = newptr;
             numbits = newlen;
         }
     }
 
     bool get(size_type i) const {
-        if (numbits == word_size) {
-            return sdo[i];
-        } else {
-            return dyna[i / 64][i % 64];
-        }
+        if (i >= numbits) return false;
+        const auto& bits = using_sdo() ? sdo : dyna[i / word_size];
+        return bits[i % word_size];
     }
 
     void set(size_type i) {
-        resize(i + 1);
-        if (numbits == word_size) {
+        if (using_sdo() && i < word_size) {
             sdo[i] = true;
         } else {
-            dyna[i / 64][i % 64] = true;
+            resize(i + 1);
+            auto& bits = using_sdo() ? sdo : dyna[i / word_size];
+            bits[i % word_size] = true;
         }
     }
 
     void unset(size_type i) {
-        resize(i + 1);
-        if (numbits == word_size) {
-            sdo[i] = false;
-        } else {
-            dyna[i / 64][i % 64] = false;
+        if (i < numbits) {
+            auto& bits = using_sdo() ? sdo : dyna[i / word_size];
+            bits[i % word_size] = false;
         }
     }
 
     void zero() {
-        if (numbits == word_size) {
-            sdo = 0;
-        } else {
-            std::fill(dyna.get(), dyna.get() + numbits / word_size, 0);
-        }
+        auto bitarr = using_sdo() ? &sdo : dyna;
+        std::fill(bitarr, bitarr + numbits / word_size, 0);
     }
-
+    
 private:
     union {
         bitset sdo;
@@ -346,16 +347,8 @@ using get_primary_t = typename get_primary<DB, Components...>::type;
 
 template <typename DB, typename HeadCom, typename... Components>
 struct get_primary<DB, HeadCom, Components...> {
-    static constexpr auto get() {
-        using category = typename component_traits<DB, HeadCom>::category;
-        if constexpr (std::is_same_v<category, component_tags::normal>) {
-            return primary<HeadCom>{};
-        } else {
-            return get_primary_t<DB, Components...>{};
-        }
-    }
-
-    using type = decltype(get());
+    using category = typename component_traits<DB, HeadCom>::category;
+    using type = std::conditional_t<std::is_same_v<category, component_tags::normal>, primary<HeadCom>, get_primary_t<DB, Components...>>;
 };
 
 template <typename DB>
@@ -380,38 +373,57 @@ struct database_traits {
     // VisitorKey
 
     template <typename Primary, typename... Coms>
-    struct visitor_key;
+    class visitor_key;
 
     template <typename Primary, typename... Coms>
-    struct visitor_key<primary<Primary>, Coms...> {
+    class visitor_key<primary<Primary>, Coms...> {
+    public:
         template <typename Com>
-        static bool check(DB& db, ent_id eid, component_tags::positive) {
+        using tag_t = typename component_traits<Com>::category;
+
+        template <typename Com>
+        using com_t = typename component_traits<Com>::component;
+
+        bool check(DB& db, ent_id eid) const {
+            int i = 0;
+            return (check<Coms>(db, eid, get_guid(index_of_v<com_t<Coms>, com_t<Coms>...>), tag_t<Coms>{}) && ...);
+        }
+
+        type_guid get_guid(std::size_t i) const {
+            if (i < sizeof...(Coms)) {
+                return guids[i];
+            } else {
+                return 0;
+            }
+        }
+    
+    private:
+        template <typename Com>
+        static bool check(DB& db, ent_id eid, type_guid guid, component_tags::positive) {
             using component = typename component_traits<Com>::component;
             if constexpr (std::is_same_v<Primary, component>) {
                 return true;
             } else {
-                return db.template has_component<component>(eid);
+                return db.template has_component<component>(eid, guid);
             }
         }
 
         template <typename Com>
-        static bool check(DB& db, ent_id eid, component_tags::inverted) {
+        static bool check(DB& db, ent_id eid, type_guid guid, component_tags::inverted) {
             using component = typename component_traits<Com>::component;
-            using inverted_key = visitor_key<primary<Primary>, component>;
-            return !inverted_key::check(db, eid);
+            if constexpr (std::is_same_v<Primary, component>) {
+                return false;
+            } else {
+                return !db.template has_component<component>(eid, guid);
+            }
         }
 
         template <typename Com>
-        static bool check(DB& db, ent_id eid, component_tags::meta) {
+        static bool check(DB& db, ent_id eid, type_guid guid, component_tags::meta) {
             return true;
         }
 
-        template <typename Com>
-        using tag_t = typename component_traits<Com>::category;
-
-        static bool check(DB& db, ent_id eid) {
-            return (check<Coms>(db, eid, tag_t<Coms>{}) && ...);
-        }
+        type_guid guids[sizeof...(Coms)] = {get_type_guid<com_t<Coms>>()...};
     };
 
     // VisitorTraits
@@ -421,33 +433,51 @@ struct database_traits {
         using ent_id = typename DB::ent_id;
         using com_id = typename DB::com_id;
         using primary_component = get_primary_t<Components...>;
-        using key = visitor_key<primary_component, Components...>;
 
+        template <typename Com>
+        using tag_t = typename component_traits<Com>::category;
+
+        template <typename Com>
+        using com_t = typename component_traits<Com>::component;
+
+        template <typename T>
+        type_guid get_guid() const {
+            return key.get_guid(index_of_v<com_t<T>, com_t<Components>...>);
+        }
+
+        template <typename Visitor>
+        auto apply(DB& db, ent_id eid, com_id primary_cid, Visitor&& visitor) {
+            if (key.check(db, eid)) {
+                return std::forward<Visitor>(visitor)(get_com<Components>(tag_t<Components>{}, db, eid, primary_cid, get_guid<Components>(), primary_component{})...);
+            }
+        }
+
+    private:
         template <typename Com, typename Primary>
-        static Com& get_com(component_tags::normal, DB& db, const ent_id& eid, const com_id& primary_cid, primary<Primary>) {
+        static Com& get_com(component_tags::normal, DB& db, const ent_id& eid, const com_id& primary_cid, type_guid guid, primary<Primary>) {
             if constexpr (std::is_same_v<Com, Primary>) {
-                return db.template get_component_by_id<Com>(primary_cid);
+                return db.template get_component_by_id<Com>(primary_cid, guid);
             } else {
-                return db.template get_component<Com>(eid);
+                return db.template get_component<Com>(eid, guid);
             }
         }
 
         template <typename Com, typename Primary>
-        static Com get_com(component_tags::optional, DB& db, const ent_id& eid, const com_id& primary_cid, primary<Primary>) {
+        static Com get_com(component_tags::optional, DB& db, const ent_id& eid, const com_id& primary_cid, type_guid guid, primary<Primary>) {
             using traits = component_traits<Com>;
             using inner_component = typename traits::component;
             using inner_traits = component_traits<inner_component>;
             using inner_category = typename inner_traits::category;
-            return get_com_optional<inner_component>(db, eid, primary_cid, primary<Primary>{}, inner_category{});
+            return get_com_optional<inner_component>(inner_category{}, db, eid, primary_cid, guid, primary<Primary>{});
         }
 
         template <typename Com, typename Primary>
-        static optional<Com> get_com_optional(component_tags::normal, DB& db, const ent_id& eid, const com_id& primary_cid, primary<Primary>) {
+        static optional<Com> get_com_optional(component_tags::normal, DB& db, const ent_id& eid, const com_id& primary_cid, type_guid guid, primary<Primary>) {
             if constexpr (std::is_same_v<Com, Primary>) {
-                return db.template get_component_by_id<Com>(primary_cid);
+                return db.template get_component_by_id<Com>(primary_cid, guid);
             } else {
                 if (db.template has_component<Com>(eid)) {
-                    return optional<Com>(db.template get_component<Com>(eid));
+                    return optional<Com>(db.template get_component<Com>(eid, guid));
                 } else {
                     return optional<Com>();
                 }
@@ -455,38 +485,27 @@ struct database_traits {
         }
 
         template <typename Com, typename Primary>
-        static optional<Com> get_com_optional(component_tags::tagged, DB& db, const ent_id& eid, const com_id& primary_cid, primary<Primary>) {
+        static optional<Com> get_com_optional(component_tags::tagged, DB& db, const ent_id& eid, const com_id& primary_cid, type_guid guid, primary<Primary>) {
             (void)primary_cid;
-            return db.template has_component<Com>(eid);
+            return optional<Com>(db.template has_component<Com>(eid, guid));
         }
 
         template <typename Com, typename Primary>
-        static const ent_id& get_com(component_tags::eid, DB& db, const ent_id& eid, const com_id& primary_cid, primary<Primary>) {
+        static const ent_id& get_com(component_tags::eid, DB& db, const ent_id& eid, const com_id& primary_cid, type_guid guid, primary<Primary>) {
             (void)db;
             (void)primary_cid;
             return eid;
         }
 
         template <typename Com, typename Primary>
-        static Com get_com(component_tags::unit, DB& db, const ent_id& eid, const com_id& primary_cid, primary<Primary>) {
+        static Com get_com(component_tags::unit, DB& db, const ent_id& eid, const com_id& primary_cid, type_guid guid, primary<Primary>) {
             (void)db;
             (void)eid;
             (void)primary_cid;
             return {};
         }
 
-        template <typename Com>
-        using tag_t = typename component_traits<Com>::category;
-
-        template <typename Visitor>
-        static auto apply(DB& db, ent_id eid, com_id primary_cid, Visitor&& visitor) {
-            return std::forward<Visitor>(visitor)(get_com<Components>(tag_t<Components>{}, db, eid, primary_cid, primary_component{})...);
-        }
-
-        template <typename Visitor>
-        static auto apply(DB& db, ent_id eid, com_id primary_cid, Visitor&& visitor, primary<void>) {
-            return std::forward<Visitor>(visitor)(get_com<Components>(tag_t<Components>{}, db, eid, primary_cid, primary<void>{})...);
-        }
+        visitor_key<primary_component, Components...> key;
     };
 
     template <typename Visitor>
@@ -525,34 +544,62 @@ inline component_set::~component_set() = default;
 template <typename T>
 class component_set_impl final : public component_set {
 public:
-    virtual ~component_set_impl() = default;
+    virtual ~component_set_impl() {
+        for (auto i = size_type{0}, sz = size(); i < sz; ++i) {
+            if (is_valid(i)) {
+                auto bucket = get_bucket_index(i);
+                auto rel_index = get_relative_index(bucket, i);
+                buckets[bucket][rel_index].component.~T();
+            }
+        }
+    }
 
     size_type assign(size_type entid, T com) {
         if (entid >= entid_to_comid.size()) {
-            entid_to_comid.resize(entid + 1, -1);
+            entid_to_comid.resize((entid + 1) * 3 / 2);
         }
 
-        auto comid = comid_to_entid.size();
+        auto index = free_head;
+        auto bucket = get_bucket_index(index);
+        auto rel_index = get_relative_index(bucket, index);
+        storage* slot;
 
-        entid_to_comid[entid] = comid;
-        comid_to_entid.push_back(entid);
-        components.push_back(std::move(com));
+        if (index == back_index) {
+            if (bucket == buckets.size()) {
+                auto bucket_size = get_bucket_size(bucket);
+                buckets.push_back(std::make_unique<storage[]>(bucket_size));
+                comid_to_entid.resize(comid_to_entid.size() + bucket_size, -1);
+            }
 
-        return comid;
+            slot = &buckets[bucket][rel_index];
+            ++back_index;
+            free_head = back_index;
+        } else {
+            slot = &buckets[bucket][rel_index];
+            free_head = slot->next_free;
+        }
+
+        new (&slot->component) T(std::move(com));
+        entid_to_comid[entid] = index;
+        comid_to_entid[index] = entid;
+
+        return index;
     }
 
     virtual void remove(size_type entid) override final {
-        auto last = comid_to_entid.size() - 1;
-        auto comid = entid_to_comid[entid];
+        auto index = entid_to_comid[entid];
+        auto bucket = get_bucket_index(index);
+        auto rel_index = get_relative_index(bucket, index);
+        auto& slot = buckets[bucket][rel_index];
 
-        entid_to_comid[entid] = -1;
-        entid_to_comid[comid_to_entid[last]] = comid;
+        slot.component.~T();
+        slot.next_free = free_head;
+        free_head = index;
+        comid_to_entid[index] = -1;
+    }
 
-        comid_to_entid[comid] = comid_to_entid[last];
-        comid_to_entid.pop_back();
-
-        components[comid] = std::move(components[last]);
-        components.pop_back();
+    bool is_valid(size_type comid) const {
+        return comid_to_entid[comid] != -1;
     }
 
     size_type get_comid(size_type entid) const {
@@ -560,7 +607,10 @@ public:
     }
 
     T& get_com(size_type comid) {
-        return components[comid];
+        auto bucket = get_bucket_index(comid);
+        auto rel_index = get_relative_index(bucket, comid);
+        auto& slot = buckets[bucket][rel_index];
+        return slot.component;
     }
 
     size_type get_entid(size_type comid) const {
@@ -568,13 +618,48 @@ public:
     }
 
     auto size() const {
-        return components.size();
+        return back_index;
+    }
+
+    auto count() const {
+        return std::count_if(
+            begin(comid_to_entid),
+            begin(comid_to_entid) + size(),
+            [&](const auto& x){ return is_valid(x); });
     }
 
 private:
+    union storage {
+        size_type next_free;
+        T component;
+
+        storage() {}
+        ~storage() {}
+    };
+
     std::vector<size_type> entid_to_comid;
     std::vector<size_type> comid_to_entid;
-    std::vector<T> components;
+    std::vector<std::unique_ptr<storage[]>> buckets;
+    size_type free_head = 0;
+    size_type back_index = 0;
+
+    static constexpr size_type bucket_size = 4096 * 8;
+
+    static size_type get_bucket_index(size_type idx) {
+        return idx / bucket_size;
+    }
+
+    static size_type get_relative_index(size_type bucket, size_type idx) {
+        return idx % bucket_size;
+    }
+
+    static size_type get_total_size(size_type num_buckets) {
+        return num_buckets * bucket_size;
+    }
+
+    static size_type get_bucket_size(size_type bucket) {
+        return bucket_size;
+    }
 };
 
 template <typename T>
@@ -734,6 +819,9 @@ public:
     template <typename T>
     void create_component(ent_id eid, optional<T> com) = delete;
 
+    template <typename T>
+    void create_component(ent_id eid, ent_id com) = delete;
+
     /*! Destroy a component.
      *
      * Destroys the given component and disassociates it from its Entity.
@@ -805,9 +893,7 @@ public:
      */
     template <typename Com>
     bool has_component(ent_id eid) {
-        auto guid = get_type_guid<Com>();
-        auto& ent_coms = entities[eid].components;
-        return guid < ent_coms.size() && ent_coms.get(guid);
+        return has_component<Com>(eid, get_type_guid<Com>());
     }
 
     /*! Visit the Database.
@@ -841,27 +927,7 @@ public:
         using traits = typename db_traits::visitor_traits<Visitor>;
         using primary_component = typename traits::primary_component;
 
-        return visit_helper( std::forward<Visitor>(visitor), primary_component{});
-    }
-
-    template <typename Visitor>
-    void visit_pairs(Visitor&& visitor) {
-        using db_traits = database_traits<database>;
-        using traits = typename db_traits::visitor_traits<Visitor>;
-        using key = typename traits::key;
-
-        for (auto eid = 0; eid < entities.size(); ++eid) {
-            if (entities[eid].components.get(0) && key::check(*this, eid)) {
-                auto inner_visitor = traits::apply(*this, eid, {}, visitor, primary<void>{});
-                using inner_traits = typename db_traits::visitor_traits<decltype(inner_visitor)>;
-                using inner_key = typename inner_traits::key;
-                for (auto inner_eid = eid + 1; inner_eid < entities.size(); ++inner_eid) {
-                    if (entities[inner_eid].components.get(0) && inner_key::check(*this, inner_eid)) {
-                        inner_traits::apply(*this, inner_eid, {}, inner_visitor, primary<void>{});
-                    }
-                }
-            }
-        }
+        return visit_helper(std::forward<Visitor>(visitor), primary_component{});
     }
 
     /*! Get the number of entities in the Database.
@@ -872,17 +938,48 @@ public:
         return entities.size() - free_entities.size();
     }
 
-    bool exists(ent_id eid) const {
-        return entities[eid].components.get(0);
+    template <typename Com>
+    auto component_count() const {
+        if (auto com_set = get_com_set<Com>()) {}
     }
 
 private:
+    friend class database_traits<database>;
+
+    template <typename Com>
+    Com& get_component(ent_id eid, type_guid guid) {
+        auto& com_set = *unsafe_get_com_set<Com>(guid);
+        auto cid = com_set.get_comid(eid);
+        return com_set.get_com(cid);
+    }
+
+    template <typename Com>
+    Com& get_component_by_id(com_id cid, type_guid guid) {
+        auto& com_set = *unsafe_get_com_set<Com>(guid);
+        return com_set.get_com(cid);
+    }
+
+    template <typename Com>
+    bool has_component(ent_id eid, type_guid guid) {
+        auto& ent_coms = entities[eid].components;
+        return ent_coms.get(guid);
+    }
+
     template <typename Com>
     component_set_impl<Com>* get_com_set() {
-        auto guid = get_type_guid<Com>();
+        return get_com_set<Com>(get_type_guid<Com>());
+    }
+
+    template <typename Com>
+    component_set_impl<Com>* get_com_set(type_guid guid) {
         if (guid >= component_sets.size()) {
             return nullptr;
         }
+        return unsafe_get_com_set<Com>(guid);
+    }
+
+    template <typename Com>
+    component_set_impl<Com>* unsafe_get_com_set(type_guid guid) {
         auto& com_set = component_sets[guid];
         auto com_set_impl = static_cast<component_set_impl<Com>*>(com_set.get());
         return com_set_impl;
@@ -905,16 +1002,17 @@ private:
     template <typename Visitor, typename Component>
     void visit_helper(Visitor&& visitor, primary<Component>) {
         using db_traits = database_traits<database>;
-        using traits = typename db_traits::visitor_traits<Visitor>;
-        using key = typename traits::key;
+        using visitor_traits = typename db_traits::visitor_traits<Visitor>;
 
-        if (auto com_set_ptr = get_com_set<Component>()) {
+        auto traits = visitor_traits{};
+
+        if (auto com_set_ptr = get_com_set<Component>(traits.template get_guid<Component>())) {
             auto& com_set = *com_set_ptr;
 
-            for (com_id cid = 0; cid < com_set.size(); ++cid) {
-                auto eid = com_set.get_entid(cid);
-                if (key::check(*this, eid)) {
-                    traits::apply(*this, eid, cid, visitor);
+            for (com_id cid = 0, sz = com_set.size(); cid < sz; ++cid) {
+                if (com_set.is_valid(cid)) {
+                    auto eid = com_set.get_entid(cid);
+                    traits.apply(*this, eid, cid, visitor);
                 }
             }
         }
@@ -923,12 +1021,13 @@ private:
     template <typename Visitor>
     void visit_helper(Visitor&& visitor, primary<void>) {
         using db_traits = database_traits<database>;
-        using traits = typename db_traits::visitor_traits<Visitor>;
-        using key = typename traits::key;
+        using visitor_traits = typename db_traits::visitor_traits<Visitor>;
+
+        auto traits = visitor_traits{};
 
         for (auto eid = 0; eid < entities.size(); ++eid) {
-            if (entities[eid].components.get(0) && key::check(*this, eid)) {
-                traits::apply(*this, eid, {}, visitor);
+            if (entities[eid].components.get(0)) {
+                traits.apply(*this, eid, {}, visitor);
             }
         }
     }

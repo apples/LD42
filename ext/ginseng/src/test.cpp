@@ -58,11 +58,15 @@ TEST_CASE("Components can be added, accessed, and removed from entities", "[gins
     REQUIRE(db.get_component<ComB>(ent).y == 4.2);
 
     db.destroy_component<ComA>(ent);
+    REQUIRE(db.has_component<ComA>(ent) == false);
+    REQUIRE(db.has_component<ComB>(ent) == true);
 
     REQUIRE(&db.get_component<ComB>(ent) == com2ptr1);
     REQUIRE(db.get_component<ComB>(ent).y == 4.2);
 
     db.destroy_component<ComB>(ent);
+    REQUIRE(db.has_component<ComA>(ent) == false);
+    REQUIRE(db.has_component<ComB>(ent) == false);
 }
 
 TEST_CASE("Databases can visit entities with specific components", "[ginseng]")
@@ -165,6 +169,25 @@ TEST_CASE("Databases can visit entities with specific components", "[ginseng]")
     REQUIRE(num_visited == 0);
 }
 
+TEST_CASE("ent_id matches all entities and is the entity's id", "[ginseng]")
+{
+    DB db;
+
+    db.create_entity();
+    db.create_entity();
+    db.create_entity();
+
+    int visited[] = {0, 0, 0};
+
+    db.visit([&](DB::ent_id eid){
+        ++visited[eid.get_index()];
+    });
+
+    REQUIRE(visited[0] == 1);
+    REQUIRE(visited[1] == 1);
+    REQUIRE(visited[2] == 1);
+}
+
 TEST_CASE("optional can be used instead of components", "[ginseng]")
 {
     DB db;
@@ -188,3 +211,40 @@ TEST_CASE("optional can be used instead of components", "[ginseng]")
     REQUIRE(bool(mdata2) == false);
 }
 
+TEST_CASE("deleted entites are not revisited", "[ginseng]")
+{
+    DB db;
+
+    struct Data {};
+
+    auto ent = db.create_entity();
+    db.create_entity();
+    db.create_entity();
+
+    int visited = 0;
+    db.visit([&](ent_id eid){
+        ++visited;
+        db.create_component(eid, Data{});
+    });
+    REQUIRE(visited == 3);
+
+    visited = 0;
+    db.visit([&](ent_id eid, Data&){
+        ++visited;
+    });
+    REQUIRE(visited == 3);
+
+    db.destroy_entity(ent);
+
+    visited = 0;
+    db.visit([&](ent_id eid){
+        ++visited;
+    });
+    REQUIRE(visited == 2);
+
+    visited = 0;
+    db.visit([&](ent_id eid, Data&){
+        ++visited;
+    });
+    REQUIRE(visited == 2);
+}
