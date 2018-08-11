@@ -7,6 +7,7 @@
 #include "resources.hpp"
 #include "sdl.hpp"
 #include "gui.hpp"
+#include "sushi_renderer.hpp"
 
 #include <sushi/framebuffer.hpp>
 #include <sushi/mesh.hpp>
@@ -15,6 +16,9 @@
 #include <soloud.h>
 
 #include <functional>
+#include <chrono>
+#include <vector>
+#include <string>
 
 class ld42_engine {
 public:
@@ -25,7 +29,7 @@ public:
     ld42_engine& operator=(ld42_engine&&) = delete;
     ~ld42_engine();
 
-    void step(const std::function<void()>& step_func);
+    void step(const std::function<void(ld42_engine& engine, double delta)>& step_func);
 
     bool handle_game_input(const SDL_Event& event);
     bool handle_gui_input(SDL_Event& event);
@@ -35,6 +39,8 @@ public:
     ember_database::ent_id entity_from_json(const nlohmann::json& json);
 
     void update_input(const std::string& name, bool keystate);
+
+    using clock = std::chrono::steady_clock;
 
     bool running;
     ember_database entities;
@@ -52,8 +58,15 @@ public:
     sushi::unique_program program;
     sushi::unique_program program_msdf;
     sushi::static_mesh sprite_mesh;
-    gui::screen root_widget;
     sol::table input_table;
+    clock::time_point prev_time;
+    std::vector<std::chrono::nanoseconds> framerate_buffer;
+    sushi_renderer renderer;
+    gui::screen gui_screen;
+    std::shared_ptr<gui::screen> root_widget;
+    std::shared_ptr<gui::label> framerate_stamp;
+    double fade;
+    double fade_dir;
 };
 
 #endif // LD42_ENGINE_HPP

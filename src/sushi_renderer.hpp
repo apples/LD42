@@ -11,9 +11,9 @@
 
 class sushi_renderer : public gui::render_context {
 public:
-    template <typename T>
-    using cache = resource_cache<T, std::string>;
-    sushi_renderer(const glm::vec2& display_area, sushi::unique_program& program, sushi::unique_program& program_msdf, cache<msdf_font>& font_cache, cache<sushi::texture_2d>& texture_cache);
+    sushi_renderer() = default;
+
+    sushi_renderer(const glm::vec2& display_area, sushi::unique_program& program, sushi::unique_program& program_msdf, resource_cache<msdf_font>& font_cache, resource_cache<sushi::texture_2d>& texture_cache);
 
     virtual void begin() override;
     virtual void end() override;
@@ -25,8 +25,8 @@ private:
     glm::vec2 display_area;
     sushi::unique_program* program;
     sushi::unique_program* program_msdf;
-    cache<msdf_font>* font_cache;
-    cache<sushi::texture_2d>* texture_cache;
+    resource_cache<msdf_font>* font_cache;
+    resource_cache<sushi::texture_2d>* texture_cache;
     sushi::static_mesh rectangle_mesh;
 };
 

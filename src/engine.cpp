@@ -2,11 +2,16 @@
 
 #include "components.hpp"
 #include "sprite.hpp"
+#include "utility.hpp"
 
 #include "platform/platform.hpp"
 #include "emberjs/config.hpp"
+#include "sushi/sushi.hpp"
 
+#include <algorithm>
 #include <iostream>
+#include <string>
+#include <cmath>
 
 ld42_engine::ld42_engine() {
     std::cout << "Init..." << std::endl;
@@ -112,8 +117,37 @@ ld42_engine::ld42_engine() {
         {{{{0,0,0},{1,1,1},{2,2,2}}},{{{2,2,2},{3,3,3},{0,0,0}}}}
     );
 
-    root_widget = gui::screen({320, 240});
-    root_widget.show();
+    std::cout << "Initializing GUI..." << std::endl;
+
+    renderer = sushi_renderer({320, 240}, program, program_msdf, resources.font_cache, resources.texture_cache);
+
+    gui_screen = gui::screen({320, 240});
+    gui_screen.show();
+
+    root_widget = std::make_shared<gui::screen>(glm::vec2{320, 240});
+    root_widget->show();
+    gui_screen.add_child(root_widget);
+
+    auto debug_root = std::make_shared<gui::screen>(glm::vec2{320, 240});
+    debug_root->show();
+    gui_screen.add_child(debug_root);
+
+    framerate_stamp = std::make_shared<gui::label>();
+    framerate_stamp->set_position({-1,-1});
+    framerate_stamp->set_font("LiberationSans-Regular");
+    framerate_stamp->set_size(renderer, 12);
+    framerate_stamp->set_text(renderer, "");
+    framerate_stamp->set_color({1,0,1,1});
+    framerate_stamp->show();
+    debug_root->add_child(framerate_stamp);
+
+    std::cout << "Finalizing engine..." << std::endl;
+
+    prev_time = clock::now();
+    framerate_buffer.reserve(10);
+
+    fade = 0.0;
+    fade_dir = 1.0;
 }
 
 ld42_engine::~ld42_engine() {
@@ -122,15 +156,73 @@ ld42_engine::~ld42_engine() {
     SDL_Quit();
 }
 
-void ld42_engine::step(const std::function<void()>& step_func) {
+void ld42_engine::step(const std::function<void(ld42_engine& engine, double delta)>& step_func) {
+    using namespace std::literals;
+
+    const auto now = clock::now();
+    const auto delta_time = now - prev_time;
+    const auto delta = std::chrono::duration<double>(delta_time).count();
+
+    prev_time = now;
+    framerate_buffer.push_back(delta_time);
+
+    if (framerate_buffer.size() >= 10) {
+        const auto avg_frame_dur = std::accumulate(begin(framerate_buffer), end(framerate_buffer), 0ns) / framerate_buffer.size();
+        const auto framerate = 1.0 / std::chrono::duration<double>(avg_frame_dur).count();
+
+        framerate_stamp->set_text(renderer, std::to_string(std::lround(framerate)) + "fps");
+        framerate_buffer.clear();
+    }
+
     SDL_Event event[2];  // Array is needed to work around stack issue in SDL_PollEvent.
     while (SDL_PollEvent(&event[0])) {
         if (handle_gui_input(event[0])) break;
         if (handle_game_input(event[0])) break;
     }
 
-    step_func();
-    
+    // Fade
+    {
+        fade = std::clamp(float(fade + delta * fade_dir), 0.f, 1.f);
+    }
+
+    // Draw scene
+    {
+        sushi::set_framebuffer(framebuffer);
+        glClearColor(0, 0, 0, 1);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glDisable(GL_DEPTH_TEST);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glViewport(0, 0, 320, 240);
+        step_func(*this, delta);
+    }
+
+    // Draw screen
+    {
+        sushi::set_framebuffer(nullptr);
+        glClearColor(0, 0, 0, 1);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glDisable(GL_DEPTH_TEST);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glViewport(0, 0, 640, 480);
+
+        const auto projmat = glm::ortho(-160.f, 160.f, -120.f, 120.f, -1.f, 1.f);
+        const auto modelmat = glm::mat4(1.f);
+        sushi::set_program(program);
+        sushi::set_uniform("MVP", projmat * modelmat);
+        sushi::set_uniform("normal_mat", glm::transpose(glm::inverse(modelmat)));
+        sushi::set_uniform("cam_forward", glm::vec3{0, 0, -1});
+        sushi::set_uniform("s_texture", 0);
+        sushi::set_uniform("tint", glm::vec4{fade, fade, fade, 1});
+        sushi::set_texture(0, framebuffer.color_texs[0]);
+        sushi::draw_mesh(framebuffer_mesh);
+
+        renderer.begin();
+        EMBER_DEFER { renderer.end(); };
+        gui_screen.draw(renderer, {0, 0});
+    }
+
     SDL_GL_SwapWindow(g_window);
     lua.collect_garbage();
 }
@@ -152,7 +244,7 @@ bool ld42_engine::handle_gui_input(SDL_Event& e) {
             switch (e.button.button) {
                 case SDL_BUTTON_LEFT: {
                     auto abs_click_pos = glm::vec2{e.button.x, display_height - e.button.y + 1};
-                    auto widget_stack = get_descendent_stack(root_widget, abs_click_pos - root_widget.get_position());
+                    auto widget_stack = get_descendent_stack(gui_screen, abs_click_pos - gui_screen.get_position());
                     while (!widget_stack.empty()) {
                         auto cur_widget = widget_stack.back();
                         auto widget_pos = get_absolute_position(*cur_widget);

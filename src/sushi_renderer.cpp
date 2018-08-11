@@ -2,7 +2,7 @@
 
 #include <glm/gtc/matrix_inverse.hpp>
 
-sushi_renderer::sushi_renderer(const glm::vec2& display_area, sushi::unique_program& program, sushi::unique_program& program_msdf, cache<msdf_font>& font_cache, cache<sushi::texture_2d>& texture_cache) :
+sushi_renderer::sushi_renderer(const glm::vec2& display_area, sushi::unique_program& program, sushi::unique_program& program_msdf, resource_cache<msdf_font>& font_cache, resource_cache<sushi::texture_2d>& texture_cache) :
     display_area(display_area),
     program(&program),
     program_msdf(&program_msdf),
