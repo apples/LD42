@@ -143,7 +143,7 @@ void render(ld42_engine& engine, double delta) {
     using namespace std::literals;
     using DB = ember_database;
 
-    auto proj = glm::ortho(-8.f, 56.f/3.f, 0.f, 20.f, 10.f, -10.f);
+    auto proj = glm::ortho(-8.f, 56.f/3.f, -0.5f, 19.5f, 10.f, -10.f);
     auto view = glm::mat4(1.f);
     auto frustum = sushi::frustum(proj * view);
 
@@ -247,6 +247,16 @@ void board_tick(ld42_engine& engine, double delta) {
                         board.grid[y][x] = engine.entities.get_component<component::net_id>(block).id;
                     }
                     engine.entities.destroy_entity(active);
+
+                    for (int y = 21; y >= 0; --y) {
+                        if (std::all_of(begin(board.grid[y]), end(board.grid[y]), [](auto& x) { return bool(x); })) {
+                            for (auto& nid : board.grid[y]) {
+                                engine.entities.destroy_entity(engine.entities.get_entity(*nid));
+                                nid = std::nullopt;
+                            }
+                        }
+                    }
+
                     active = engine.entities.create_entity();
                     engine.entities.create_component(active, component::position{5, 19});
                     engine.entities.create_component(active, get_random_shape(engine.rng));
