@@ -110,8 +110,8 @@ int main(int argc, char* argv[]) try {
         engine.load_world(nlohmann::json::array({}));
 
         auto active = engine.entities.create_entity();
-        engine.entities.create_component(active, component::position{5, 19});
-        engine.entities.create_component(active, get_random_shape(engine.rng));
+        engine.entities.create_component(active, component::position{4, 19});
+        engine.entities.create_component(active, get_random_shape(engine.rng, engine.bag));
         {
             auto board = engine.entities.create_entity();
             engine.entities.create_component(board, component::board{

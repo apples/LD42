@@ -7,7 +7,7 @@
 #include <algorithm>
 
 template <typename Rng>
-auto get_random_shape(Rng& rng) -> component::shape {
+auto get_random_shape(Rng& rng, std::vector<component::shape>& bag) -> component::shape {
     const auto o_block = component::shape{{{{0, 0}, {1, 0}, {0, 1}, {1, 1}}}, {}, {0.5f, 0.5f}};
     const auto i_block = component::shape{{{{0, 0}, {0, 1}, {0, 2}, {0, 3}}}, {}, {0.5f, 1.5f}};
     const auto t_block = component::shape{{{{0, 0}, {1, 0}, {1, 1}, {2, 0}}}, {}, {1.f, 0.f}};
@@ -16,20 +16,22 @@ auto get_random_shape(Rng& rng) -> component::shape {
     const auto s_block = component::shape{{{{0, 0}, {1, 0}, {1, 1}, {2, 1}}}, {}, {1.f, 0.f}};
     const auto z_block = component::shape{{{{0, 1}, {1, 1}, {1, 0}, {2, 0}}}, {}, {1.f, 0.f}};
 
-    const component::shape blocks[7] = {
-        o_block,
-        i_block,
-        t_block,
-        j_block,
-        l_block,
-        s_block,
-        z_block,
-    };
+    if (bag.empty()) {
+        bag.push_back(o_block);
+        bag.push_back(i_block);
+        bag.push_back(t_block);
+        bag.push_back(j_block);
+        bag.push_back(l_block);
+        bag.push_back(s_block);
+        bag.push_back(z_block);
 
-    auto roll_block = std::uniform_int_distribution{0, 6};
+        std::shuffle(begin(bag), end(bag), rng);
+    }
+
     auto roll_color = std::uniform_int_distribution{1, 2};
 
-    auto block = blocks[roll_block(rng)];
+    auto block = bag.back();
+    bag.pop_back();
 
     block.colors[0] = roll_color(rng);
     block.colors[3] = roll_color(rng);

@@ -1,6 +1,7 @@
 #ifndef LD42_ENGINE_HPP
 #define LD42_ENGINE_HPP
 
+#include "components.hpp"
 #include "entities.hpp"
 #include "scripting.hpp"
 #include "json.hpp"
@@ -71,6 +72,7 @@ public:
     double fade;
     double fade_dir;
     std::mt19937 rng;
+    std::vector<component::shape> bag;
 };
 
 #endif // LD42_ENGINE_HPP

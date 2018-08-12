@@ -254,12 +254,22 @@ void board_tick(ld42_engine& engine, double delta) {
                                 engine.entities.destroy_entity(engine.entities.get_entity(*nid));
                                 nid = std::nullopt;
                             }
+                            for (int oy = y + 1; oy < 22; ++oy) {
+                                for (auto& nid : board.grid[oy]) {
+                                    if (nid) {
+                                        auto& pos = engine.entities.get_component<component::position>(engine.entities.get_entity(*nid));
+                                        pos.y -= 1;
+                                    }
+                                }
+                                board.grid[oy - 1] = std::move(board.grid[oy]);
+                            }
+                            board.grid[21] = {};
                         }
                     }
 
                     active = engine.entities.create_entity();
-                    engine.entities.create_component(active, component::position{5, 19});
-                    engine.entities.create_component(active, get_random_shape(engine.rng));
+                    engine.entities.create_component(active, component::position{4, 19});
+                    engine.entities.create_component(active, get_random_shape(engine.rng, engine.bag));
                     board.active = engine.entities.get_component<component::net_id>(active).id;
                 } else {
                     pos.y -= 1;
