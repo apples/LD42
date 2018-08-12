@@ -189,7 +189,35 @@ void board_tick(ld42_engine& engine, double delta) {
                 pos.x += 1;
             }
 
-            if ((board.next_tick -= delta) <= 0.0) {
+            // Rotation
+            if (engine.input_table.get_or("up_pressed", false)) {
+                auto new_shape = shape;
+                auto rotmat = glm::mat2({0.f, -1.f}, {1.f, 0.f});
+                for (int i=0; i<4; ++i) {
+                    new_shape.pieces[i] = glm::ivec2(glm::round(rotmat * (glm::vec2(new_shape.pieces[i]) - new_shape.pivot) + new_shape.pivot));
+                }
+                auto is_good = [&] {
+                    for (int i = 0; i < 4; ++i) {
+                        auto x = pos.x + new_shape.pieces[i].x;
+                        auto y = pos.y + new_shape.pieces[i].y;
+                        if (x < 0 || x >= board.grid[0].size() || y < 0 || y >= board.grid.size() || board.grid[y][x]) {
+                            return false;
+                        }
+                    }
+                    return true;
+                };
+                if (is_good()) {
+                    shape = new_shape;
+                }
+            }
+
+            board.next_tick -= delta;
+
+            if (engine.input_table.get_or("down", false)) {
+                board.next_tick -= delta;
+            }
+
+            if (board.next_tick <= 0.0) {
                 board.next_tick += 0.25;
                 auto should_lock = [&] {
                     for (int i = 0; i < 4; ++i) {
