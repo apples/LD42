@@ -248,6 +248,8 @@ void board_tick(ld42_engine& engine, double delta) {
                     }
                     engine.entities.destroy_entity(active);
 
+                    // Clear lines
+
                     for (int y = 21; y >= 0; --y) {
                         if (std::all_of(begin(board.grid[y]), end(board.grid[y]), [](auto& x) { return bool(x); })) {
                             for (auto& nid : board.grid[y]) {
@@ -266,6 +268,90 @@ void board_tick(ld42_engine& engine, double delta) {
                             board.grid[21] = {};
                         }
                     }
+
+                    // Clear color groups
+
+                    {
+                        struct cell_info {
+                            cell_info* root = nullptr;
+                            int group_size = 0;
+                            int color = 0;
+                        };
+                        std::array<std::array<cell_info, 10>, 22> cells;
+                        for (int y = 0; y < 22; ++y) {
+                            cell_info* cur_root = nullptr;
+                            for (int x = 0; x < 10; ++x) {
+                                if (board.grid[y][x]) {
+                                    auto& block = engine.entities.get_component<component::block>(engine.entities.get_entity(*board.grid[y][x]));
+                                    if (block.color != 0) {
+                                        cells[y][x].color = block.color;
+                                        if (cur_root && block.color == cur_root->color) {
+                                            cells[y][x].root = cur_root;
+                                            ++cur_root->group_size;
+                                        } else {
+                                            cur_root = &cells[y][x];
+                                            ++cur_root->group_size;
+                                            cur_root->color = block.color;
+                                        }
+                                    } else {
+                                        cur_root = nullptr;
+                                    }
+                                } else {
+                                    cur_root = nullptr;
+                                }
+                            }
+                        }
+                        for (int x = 0; x < 10; ++x) {
+                            cell_info* cur_root = nullptr;
+                            for (int y = 0; y < 22; ++y) {
+                                if (board.grid[y][x]) {
+                                    auto& block = engine.entities.get_component<component::block>(engine.entities.get_entity(*board.grid[y][x]));
+                                    if (block.color != 0) {
+                                        cells[y][x].color = block.color;
+                                        if (cur_root && block.color == cur_root->color) {
+                                                for (auto& row : cells) {
+                                                    for (auto& cell : row) {
+                                                        if (cell.root == &cells[y][x]) {
+                                                            cell.root = cur_root;
+                                                            cell.group_size = 0;
+                                                            ++cur_root->group_size;
+                                                        }
+                                                    }
+                                                }
+                                            cells[y][x].root = cur_root;
+                                            ++cur_root->group_size;
+                                        } else {
+                                            cur_root = &cells[y][x];
+                                            while (cur_root->root) {
+                                                cur_root = cur_root->root;
+                                            }
+                                        }
+                                    } else {
+                                        cur_root = nullptr;
+                                    }
+                                } else {
+                                    cur_root = nullptr;
+                                }
+                            }
+                        }
+                        for (int y = 21; y >= 0; --y) {
+                            for (int x = 0; x < 10; ++x) {
+                                if (cells[y][x].group_size >= 3 || cells[y][x].root && cells[y][x].root->group_size >= 3) {
+                                    engine.entities.destroy_entity(engine.entities.get_entity(*board.grid[y][x]));
+                                    for (int oy = y + 1; oy < 22; ++oy) {
+                                        if (board.grid[oy][x]) {
+                                            auto& pos = engine.entities.get_component<component::position>(engine.entities.get_entity(*board.grid[oy][x]));
+                                            pos.y -= 1;
+                                        }
+                                        board.grid[oy - 1][x] = std::move(board.grid[oy][x]);
+                                    }
+                                    board.grid[21][x] = std::nullopt;
+                                }
+                            }
+                        }
+                    }
+
+                    // Spawn next piece
 
                     active = engine.entities.create_entity();
                     engine.entities.create_component(active, component::position{4, 19});
