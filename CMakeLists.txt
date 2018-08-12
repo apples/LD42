@@ -156,8 +156,9 @@ else()
             winmm
             version)
         target_compile_options(ld42_client PRIVATE
-            "$<$<CONFIG:DEBUG>:-Og>"
             "$<$<CONFIG:DEBUG>:-Wa,-mbig-obj>")
+        set_source_files_properties(src/components.cpp PROPERTIES
+            COMPILE_OPTIONS "$<$<CONFIG:DEBUG>:-Og>")
     endif()
     add_dependencies(ld42_client ld42_data)
 

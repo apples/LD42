@@ -22,4 +22,5 @@ void gameplay_state(ld42_engine& engine, double delta) {
     systems::scripting(engine, delta);
     systems::death_timer(engine, delta);
     systems::render(engine, delta);
+    systems::board_tick(engine, delta);
 }

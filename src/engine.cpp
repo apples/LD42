@@ -1,6 +1,7 @@
 #include "engine.hpp"
 
 #include "components.hpp"
+#include "component_scripting.hpp"
 #include "sprite.hpp"
 #include "utility.hpp"
 
@@ -12,6 +13,8 @@
 #include <iostream>
 #include <string>
 #include <cmath>
+#include <vector>
+#include <unordered_map>
 
 ld42_engine::ld42_engine() {
     std::cout << "Init..." << std::endl;
@@ -194,6 +197,7 @@ void ld42_engine::step(const std::function<void(ld42_engine& engine, double delt
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glViewport(0, 0, 320, 240);
+        sushi::set_program(program);
         step_func(*this, delta);
     }
 
@@ -278,9 +282,9 @@ void ld42_engine::play_music(const std::string& name) {
 }
 
 ember_database::ent_id ld42_engine::entity_from_json(const nlohmann::json& json) {
-    auto loader_ptr = resources.environment_cache.get("system/loader");
-    auto eid = (*loader_ptr)["load_entity"](scripting::json_to_lua(lua, json)).get<ember_database::ent_id>();
-    return eid;
+    auto& loader = *resources.environment_cache.get("system/loader");
+    auto data = json.get<std::unordered_map<std::string, nlohmann::json>>();
+    return loader["load_entity"](json).get<ember_database::ent_id>();
 }
 
 void ld42_engine::update_input(const std::string& name, bool keystate) {
@@ -295,4 +299,13 @@ void ld42_engine::update_input(const std::string& name, bool keystate) {
         input_table[name + "_pressed"] = bool(keystate);
         input_table[name + "_released"] = false;
     }
+}
+
+void ld42_engine::load_world(const nlohmann::json& json) {
+    entities.visit([&](ember_database::ent_id eid) {
+        entities.destroy_entity(eid);
+    });
+    auto& loader = *resources.environment_cache.get("system/loader");
+    auto data = json.get<std::vector<std::unordered_map<std::string, nlohmann::json>>>();
+    loader["load_world"](data);
 }

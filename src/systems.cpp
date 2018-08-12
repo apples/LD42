@@ -171,6 +171,35 @@ void render(ld42_engine& engine, double delta) {
             sushi::draw_mesh(engine.sprite_mesh);
         }
     });
+    engine.entities.visit([&](DB::ent_id eid, const component::position& pos, const component::shape& shape) {
+        using namespace std::literals;
+
+        for (int i = 0; i < 4; ++i) {
+            auto modelmat = glm::mat4(1);
+            modelmat = glm::translate(modelmat, glm::vec3(glm::vec2(pos.x, pos.y) + glm::vec2(shape.pieces[i]), 0.f));
+
+            auto tint = glm::vec4{1, 1, 1, 1};
+
+            sushi::set_texture(0, *engine.resources.texture_cache.get("block_"s + std::to_string(shape.colors[i])));
+            sushi::set_uniform("normal_mat", glm::inverseTranspose(view * modelmat));
+            sushi::set_uniform("MVP", (proj * view * modelmat));
+            sushi::set_uniform("tint", tint);
+            sushi::draw_mesh(engine.sprite_mesh);
+        }
+    });
+}
+
+void board_tick(ld42_engine& engine, double delta) {
+    engine.entities.visit([&](component::board& board) {
+        if ((board.next_tick -= delta) <= 0.0) {
+            board.next_tick += 1.0;
+            if (board.active) {
+                auto active = engine.entities.get_entity(*board.active);
+                auto& pos = engine.entities.get_component<component::position>(active);
+                pos.y -= 1;
+            }
+        }
+    });
 }
 
 }  //namespace systems

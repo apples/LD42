@@ -10,6 +10,7 @@ void collision(ld42_engine& engine, double delta);
 void scripting(ld42_engine& engine, double delta);
 void death_timer(ld42_engine& engine, double delta);
 void render(ld42_engine& engine, double delta);
+void board_tick(ld42_engine& engine, double delta);
 
 } //namespace systems
 

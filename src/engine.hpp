@@ -40,6 +40,8 @@ public:
 
     void update_input(const std::string& name, bool keystate);
 
+    void load_world(const nlohmann::json& json);
+
     using clock = std::chrono::steady_clock;
 
     bool running;

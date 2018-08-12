@@ -4,6 +4,7 @@
 #include "json.hpp"
 #include "scripting.hpp"
 #include "entities.hpp"
+#include "glm_json.hpp"
 
 #include <type_traits>
 #include <utility>
@@ -37,6 +38,9 @@ void new_component_usertype(sol::table& lua, const std::string& name, Args&&... 
         },
         "_has_component", [=](ember_database& db, ember_database::ent_id eid) {
             return db.has_component<T>(eid);
+        },
+        "from_json", [](const nlohmann::json& json) {
+            return json.get<T>();
         });
 }
 
@@ -65,9 +69,9 @@ template <typename T>
 void from_json(const nlohmann::json& json, T& msg) {
     using type = std::decay_t<T>;
     meta::doForAllMembers<type>([&](auto& member) {
-            using member_type = meta::get_member_type<decltype(member)>;
-            member.set(msg, json[member.getName()].template get<member_type>());
-        });
+        using member_type = meta::get_member_type<decltype(member)>;
+        member.set(msg, json[member.getName()].template get<member_type>());
+    });
 }
 
 template <typename T>

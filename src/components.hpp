@@ -12,7 +12,7 @@
 #include <functional>
 #include <string>
 #include <type_traits>
-
+#include <array>
 #include <memory>
 #include <chrono>
 
@@ -106,6 +106,26 @@ struct death_timer {
 
 REGISTER(death_timer,
          MEMBER(time))
+
+struct shape {
+    std::array<glm::ivec2, 4> pieces;
+    std::array<int, 4> colors;
+};
+
+REGISTER(shape,
+         MEMBER(pieces),
+         MEMBER(colors))
+
+struct board {
+    std::array<std::array<std::optional<ember_database::net_id>, 7>, 10> grid;
+    std::optional<ember_database::net_id> active;
+    double next_tick = 0.0;
+};
+
+REGISTER(board,
+         MEMBER(grid),
+         MEMBER(active),
+         MEMBER(next_tick))
 
 } //namespace component
 

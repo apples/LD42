@@ -109,6 +109,19 @@ int main(int argc, char* argv[]) try {
         });
         engine.fade = 0.0;
         engine.fade_dir = 1.0;
+        engine.load_world(nlohmann::json::array({}));
+
+        auto active = engine.entities.create_entity();
+        engine.entities.create_component(active, component::position{5, 5});
+        engine.entities.create_component(active, component::shape{{{{0,0},{1,0},{1,1},{2,1}}}, {{1,0,0,1}}});
+        {
+            auto board = engine.entities.create_entity();
+            engine.entities.create_component(board, component::board{
+                {},
+                engine.entities.get_component<component::net_id>(active).id
+            });
+        }
+        
         set_game_state("gameplay");
     });
 
