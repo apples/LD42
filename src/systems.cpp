@@ -140,24 +140,33 @@ void death_timer(ld42_engine& engine, double delta) {
 }
 
 void render(ld42_engine& engine, double delta) {
+    using namespace std::literals;
     using DB = ember_database;
+
     auto proj = glm::ortho(-8.f, 56.f/3.f, 0.f, 20.f, 10.f, -10.f);
     auto view = glm::mat4(1.f);
     auto frustum = sushi::frustum(proj * view);
 
+    auto draw_block = [&](glm::vec2 pos, int color) {
+        auto piece_modelmat = glm::translate(glm::mat4(1), glm::vec3(pos, 0.f));
+        auto tint = glm::vec4{1, 1, 1, 1};
+
+        sushi::set_texture(0, *engine.resources.texture_cache.get("block_"s + std::to_string(color)));
+        sushi::set_uniform("normal_mat", glm::inverseTranspose(view * piece_modelmat));
+        sushi::set_uniform("MVP", (proj * view * piece_modelmat));
+        sushi::set_uniform("tint", tint);
+        sushi::draw_mesh(engine.sprite_mesh);
+    };
+
     engine.entities.visit([&](DB::ent_id eid, const component::position& pos, const component::shape& shape) {
-        using namespace std::literals;
-
         for (int i = 0; i < 4; ++i) {
-            auto piece_modelmat = glm::translate(glm::mat4(1), glm::vec3(glm::vec2(pos.x, pos.y) + glm::vec2(shape.pieces[i]), 0.f));
-            auto tint = glm::vec4{1, 1, 1, 1};
-
-            sushi::set_texture(0, *engine.resources.texture_cache.get("block_"s + std::to_string(shape.colors[i])));
-            sushi::set_uniform("normal_mat", glm::inverseTranspose(view * piece_modelmat));
-            sushi::set_uniform("MVP", (proj * view * piece_modelmat));
-            sushi::set_uniform("tint", tint);
-            sushi::draw_mesh(engine.sprite_mesh);
+            auto xy = glm::vec2(pos.x, pos.y) + glm::vec2(shape.pieces[i]);
+            draw_block(xy, shape.colors[i]);
         }
+    });
+
+    engine.entities.visit([&](DB::ent_id eid, const component::position& pos, const component::block& block) {
+        draw_block(glm::vec2(pos.x, pos.y), block.color);
     });
 }
 
@@ -230,9 +239,15 @@ void board_tick(ld42_engine& engine, double delta) {
 
                 if (should_lock()) {
                     for (int i = 0; i < 4; ++i) {
-                        board.grid[pos.y + shape.pieces[i].y][pos.x + shape.pieces[i].x] = nid;
+                        auto x = pos.x + shape.pieces[i].x;
+                        auto y = pos.y + shape.pieces[i].y;
+                        auto block = engine.entities.create_entity();
+                        engine.entities.create_component(block, component::position{x, y});
+                        engine.entities.create_component(block, component::block{shape.colors[i]});
+                        board.grid[y][x] = engine.entities.get_component<component::net_id>(block).id;
                     }
-                    auto active = engine.entities.create_entity();
+                    engine.entities.destroy_entity(active);
+                    active = engine.entities.create_entity();
                     engine.entities.create_component(active, component::position{5, 19});
                     engine.entities.create_component(active, get_random_shape(engine.rng));
                     board.active = engine.entities.get_component<component::net_id>(active).id;

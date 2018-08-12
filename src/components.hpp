@@ -129,6 +129,13 @@ REGISTER(board,
          MEMBER(active),
          MEMBER(next_tick))
 
+struct block {
+    int color;
+};
+
+REGISTER(block,
+         MEMBER(color))
+
 } //namespace component
 
 #undef MEMBER

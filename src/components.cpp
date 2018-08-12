@@ -37,6 +37,7 @@ void register_components(sol::table& component_table) {
     scripting::register_type<component::death_timer>(component_table);
     scripting::register_type<component::shape>(component_table);
     scripting::register_type<component::board>(component_table);
+    scripting::register_type<component::block>(component_table);
 }
 
 } //namespace compoennt
