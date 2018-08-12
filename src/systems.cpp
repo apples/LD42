@@ -196,7 +196,29 @@ void board_tick(ld42_engine& engine, double delta) {
             if (board.active) {
                 auto active = engine.entities.get_entity(*board.active);
                 auto& pos = engine.entities.get_component<component::position>(active);
-                pos.y -= 1;
+                auto& shape = engine.entities.get_component<component::shape>(active);
+                auto nid = engine.entities.get_component<component::net_id>(active).id;
+
+                auto should_lock = [&] {
+                    for (int i = 0; i < 4; ++i) {
+                        if (pos.y + shape.pieces[i].y < 0 || board.grid[pos.y + shape.pieces[i].y - 1][pos.x + shape.pieces[i].x]) {
+                            return true;
+                        }
+                    }
+                    return false;
+                };
+
+                if (should_lock()) {
+                    for (int i = 0; i < 4; ++i) {
+                        board.grid[pos.y + shape.pieces[i].y][pos.x + shape.pieces[i].x] = nid;
+                    }
+                    auto active = engine.entities.create_entity();
+                    engine.entities.create_component(active, component::position{5, 5});
+                    engine.entities.create_component(active, component::shape{{{{0, 0}, {1, 0}, {1, 1}, {2, 1}}}, {{1, 0, 0, 1}}});
+                    board.active = engine.entities.get_component<component::net_id>(active).id;
+                } else {
+                    pos.y -= 1;
+                }
             }
         }
     });
