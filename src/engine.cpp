@@ -183,6 +183,17 @@ void ld42_engine::step(const std::function<void(ld42_engine& engine, double delt
         if (handle_game_input(event[0])) break;
     }
 
+    // Input
+    {
+        const Uint8* keys = SDL_GetKeyboardState(nullptr);
+
+        update_input("left", keys[SDL_SCANCODE_LEFT]);
+        update_input("right", keys[SDL_SCANCODE_RIGHT]);
+        update_input("up", keys[SDL_SCANCODE_UP]);
+        update_input("down", keys[SDL_SCANCODE_DOWN]);
+        update_input("shoot", keys[SDL_SCANCODE_SPACE]);
+    }
+
     // Fade
     {
         fade = std::clamp(float(fade + delta * fade_dir), 0.f, 1.f);

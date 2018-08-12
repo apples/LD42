@@ -4,11 +4,13 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
+#include <sol.hpp>
 #include <sushi/frustum.hpp>
+#include <sushi/mesh.hpp>
 #include <sushi/shader.hpp>
 #include <sushi/texture.hpp>
-#include <sushi/mesh.hpp>
-#include <sol.hpp>
+
+#include <iostream>
 
 namespace systems {
 
@@ -34,11 +36,10 @@ void collision(ld42_engine& engine, double delta) {
     };
 
     auto intersects = [](const component::aabb& a, const component::aabb& b) {
-        return
-            a.left < b.right &&
-            b.left < a.right &&
-            a.bottom < b.top &&
-            b.top < a.bottom;
+        return a.left < b.right &&
+               b.left < a.right &&
+               a.bottom < b.top &&
+               b.top < a.bottom;
     };
 
     std::vector<entity_info> world;
@@ -60,7 +61,7 @@ void collision(ld42_engine& engine, double delta) {
     });
 
     // Sort along X-axis
-    std::sort(begin(world), end(world), [](const entity_info& a, const entity_info& b){
+    std::sort(begin(world), end(world), [](const entity_info& a, const entity_info& b) {
         return a.aabb.left < a.aabb.right;
     });
 
@@ -72,7 +73,7 @@ void collision(ld42_engine& engine, double delta) {
                 return other_info->aabb.right < info.aabb.left;
             }),
             end(axis_list));
-        
+
         // Check pairs
         for (const auto& other_info : axis_list) {
             auto manifold = collision_manifold{};
@@ -191,17 +192,37 @@ void render(ld42_engine& engine, double delta) {
 
 void board_tick(ld42_engine& engine, double delta) {
     engine.entities.visit([&](component::board& board) {
-        if ((board.next_tick -= delta) <= 0.0) {
-            board.next_tick += 1.0;
-            if (board.active) {
-                auto active = engine.entities.get_entity(*board.active);
-                auto& pos = engine.entities.get_component<component::position>(active);
-                auto& shape = engine.entities.get_component<component::shape>(active);
-                auto nid = engine.entities.get_component<component::net_id>(active).id;
+        if (board.active) {
+            auto active = engine.entities.get_entity(*board.active);
+            auto& pos = engine.entities.get_component<component::position>(active);
+            auto& shape = engine.entities.get_component<component::shape>(active);
+            auto nid = engine.entities.get_component<component::net_id>(active).id;
 
+            // Movement
+
+            auto can_move = [&](int dir) {
+                for (int i = 0; i < 4; ++i) {
+                    auto x = pos.x + shape.pieces[i].x + dir;
+                    if (x < 0 || x >= board.grid[0].size() || board.grid[pos.y + shape.pieces[i].y][x]) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+
+            if (engine.input_table.get_or("left_pressed", false) && can_move(-1)) {
+                pos.x -= 1;
+            }
+
+            if (engine.input_table.get_or("right_pressed", false) && can_move(1)) {
+                pos.x += 1;
+            }
+
+            if ((board.next_tick -= delta) <= 0.0) {
+                board.next_tick += 1.0;
                 auto should_lock = [&] {
                     for (int i = 0; i < 4; ++i) {
-                        if (pos.y + shape.pieces[i].y < 0 || board.grid[pos.y + shape.pieces[i].y - 1][pos.x + shape.pieces[i].x]) {
+                        if (pos.y + shape.pieces[i].y - 1 < 0 || board.grid[pos.y + shape.pieces[i].y - 1][pos.x + shape.pieces[i].x]) {
                             return true;
                         }
                     }

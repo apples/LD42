@@ -84,9 +84,6 @@ int main(int argc, char* argv[]) try {
         return [menu_screen, on_next](ld42_engine& engine, double delta) {
             // Update
 
-            const auto keys = SDL_GetKeyboardState(nullptr);
-            engine.update_input("shoot", keys[SDL_SCANCODE_SPACE]);
-
             if (engine.fade == 1.f && engine.input_table["shoot_pressed"]) {
                 engine.fade_dir = -1.f;
             } else if (engine.fade == 0.f) {
