@@ -1,6 +1,7 @@
 #include "systems.hpp"
 
 #include "components.hpp"
+#include "tetromino.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
@@ -140,50 +141,20 @@ void death_timer(ld42_engine& engine, double delta) {
 
 void render(ld42_engine& engine, double delta) {
     using DB = ember_database;
-    auto proj = glm::ortho(-7.5f * engine.aspect_ratio, 7.5f * engine.aspect_ratio, -7.5f, 7.5f, 7.5f, -7.5f);
+    auto proj = glm::ortho(-8.f, 56.f/3.f, 0.f, 20.f, 10.f, -10.f);
     auto view = glm::mat4(1.f);
     auto frustum = sushi::frustum(proj * view);
-    engine.entities.visit([&](DB::ent_id eid, const component::position& pos, component::animation& anim) {
-        if (frustum.contains({pos.x, pos.y, 0.f}, std::sqrt(0.5 * 0.5 * 2.f))) {
-            auto modelmat = glm::mat4(1);
-            modelmat = glm::translate(modelmat, {int(pos.x * 16) / 16.f, int(pos.y * 16) / 16.f, 0});
 
-            modelmat = glm::scale(modelmat, {anim.scale, anim.scale, anim.scale});
-            modelmat = glm::rotate(modelmat, anim.rot, {0, 0, 1});
-            modelmat = glm::translate(modelmat, {anim.offset_x, anim.offset_y, 0});
-
-            auto tint = glm::vec4{1, 1, 1, 1};
-
-            // animation code
-            auto jsonAnim = *engine.resources.animation_cache.get(anim.name);
-            auto tMilliSecond = float(jsonAnim[anim.cycle]["frame"][anim.frame]["t"]) / 1000.f;
-            anim.t += delta / 10;
-            if (anim.t > tMilliSecond) {
-                int nextFrame = jsonAnim[anim.cycle]["frame"][anim.frame]["nextFrame"];
-                anim.frame = nextFrame;
-                anim.t = 0;
-            }
-            auto pathToTexture = jsonAnim[anim.cycle]["frame"][anim.frame]["path"];
-
-            sushi::set_texture(0, *engine.resources.texture_cache.get(pathToTexture));
-            sushi::set_uniform("normal_mat", glm::inverseTranspose(view * modelmat));
-            sushi::set_uniform("MVP", (proj * view * modelmat));
-            sushi::set_uniform("tint", tint);
-            sushi::draw_mesh(engine.sprite_mesh);
-        }
-    });
     engine.entities.visit([&](DB::ent_id eid, const component::position& pos, const component::shape& shape) {
         using namespace std::literals;
 
         for (int i = 0; i < 4; ++i) {
-            auto modelmat = glm::mat4(1);
-            modelmat = glm::translate(modelmat, glm::vec3(glm::vec2(pos.x, pos.y) + glm::vec2(shape.pieces[i]), 0.f));
-
+            auto piece_modelmat = glm::translate(glm::mat4(1), glm::vec3(glm::vec2(pos.x, pos.y) + glm::vec2(shape.pieces[i]), 0.f));
             auto tint = glm::vec4{1, 1, 1, 1};
 
             sushi::set_texture(0, *engine.resources.texture_cache.get("block_"s + std::to_string(shape.colors[i])));
-            sushi::set_uniform("normal_mat", glm::inverseTranspose(view * modelmat));
-            sushi::set_uniform("MVP", (proj * view * modelmat));
+            sushi::set_uniform("normal_mat", glm::inverseTranspose(view * piece_modelmat));
+            sushi::set_uniform("MVP", (proj * view * piece_modelmat));
             sushi::set_uniform("tint", tint);
             sushi::draw_mesh(engine.sprite_mesh);
         }
@@ -219,7 +190,7 @@ void board_tick(ld42_engine& engine, double delta) {
             }
 
             if ((board.next_tick -= delta) <= 0.0) {
-                board.next_tick += 1.0;
+                board.next_tick += 0.25;
                 auto should_lock = [&] {
                     for (int i = 0; i < 4; ++i) {
                         if (pos.y + shape.pieces[i].y - 1 < 0 || board.grid[pos.y + shape.pieces[i].y - 1][pos.x + shape.pieces[i].x]) {
@@ -234,8 +205,8 @@ void board_tick(ld42_engine& engine, double delta) {
                         board.grid[pos.y + shape.pieces[i].y][pos.x + shape.pieces[i].x] = nid;
                     }
                     auto active = engine.entities.create_entity();
-                    engine.entities.create_component(active, component::position{5, 5});
-                    engine.entities.create_component(active, component::shape{{{{0, 0}, {1, 0}, {1, 1}, {2, 1}}}, {{1, 0, 0, 1}}});
+                    engine.entities.create_component(active, component::position{5, 19});
+                    engine.entities.create_component(active, get_random_shape(engine.rng));
                     board.active = engine.entities.get_component<component::net_id>(active).id;
                 } else {
                     pos.y -= 1;

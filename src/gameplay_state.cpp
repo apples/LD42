@@ -5,9 +5,6 @@
 #include <chrono>
 
 void gameplay_state(ld42_engine& engine, double delta) {
-
-    // Update
-
     systems::movement(engine, delta);
     systems::collision(engine, delta);
     systems::scripting(engine, delta);

@@ -19,6 +19,7 @@
 #include <chrono>
 #include <vector>
 #include <string>
+#include <random>
 
 class ld42_engine {
 public:
@@ -69,6 +70,7 @@ public:
     std::shared_ptr<gui::label> framerate_stamp;
     double fade;
     double fade_dir;
+    std::mt19937 rng;
 };
 
 #endif // LD42_ENGINE_HPP

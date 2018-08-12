@@ -151,6 +151,8 @@ ld42_engine::ld42_engine() {
 
     fade = 0.0;
     fade_dir = 1.0;
+
+    rng = std::mt19937(std::random_device{}());
 }
 
 ld42_engine::~ld42_engine() {

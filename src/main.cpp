@@ -12,6 +12,7 @@
 #include "sushi_renderer.hpp"
 #include "systems.hpp"
 #include "utility.hpp"
+#include "tetromino.hpp"
 
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtx/intersect.hpp>
@@ -109,8 +110,8 @@ int main(int argc, char* argv[]) try {
         engine.load_world(nlohmann::json::array({}));
 
         auto active = engine.entities.create_entity();
-        engine.entities.create_component(active, component::position{5, 5});
-        engine.entities.create_component(active, component::shape{{{{0,0},{1,0},{1,1},{2,1}}}, {{1,0,0,1}}});
+        engine.entities.create_component(active, component::position{5, 19});
+        engine.entities.create_component(active, get_random_shape(engine.rng));
         {
             auto board = engine.entities.create_entity();
             engine.entities.create_component(board, component::board{

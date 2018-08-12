@@ -110,14 +110,16 @@ REGISTER(death_timer,
 struct shape {
     std::array<glm::ivec2, 4> pieces;
     std::array<int, 4> colors;
+    glm::vec2 pivot;
 };
 
 REGISTER(shape,
          MEMBER(pieces),
-         MEMBER(colors))
+         MEMBER(colors),
+         MEMBER(pivot))
 
 struct board {
-    std::array<std::array<std::optional<ember_database::net_id>, 7>, 10> grid;
+    std::array<std::array<std::optional<ember_database::net_id>, 10>, 22> grid;
     std::optional<ember_database::net_id> active;
     double next_tick = 0.0;
 };
