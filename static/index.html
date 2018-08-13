@@ -48,7 +48,7 @@
     </style>
   </head>
   <body>
-    <div class="emscripten_border" id="canvasdiv" hidden>
+    <div class="emscripten_border" id="canvasdiv" style="display: none;">
       <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()"></canvas>
     </div>
     <hr/>
@@ -121,7 +121,7 @@
             progressElement.hidden = true;
             if (!text) {
               spinnerElement.hidden = true;
-              canvasdiv.hidden = false;
+              canvasdivElement.style.display = 'block';
             }
           }
           statusElement.innerHTML = text;
