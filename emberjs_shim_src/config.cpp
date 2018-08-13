@@ -12,7 +12,7 @@ char* ember_config_get() {
             "width": 640,
             "height": 480
         },
-        "volume": 0.3
+        "volume": 1.0
     })";
     auto str = (char*)malloc(strlen(config) + 1);
     strcpy(str, config);

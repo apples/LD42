@@ -140,6 +140,8 @@ int main(int argc, char* argv[]) try {
 
     loop = main_menu_loop;
 
+    engine.toggle_music("bgm");
+
 #ifdef __EMSCRIPTEN__
     emscripten_set_main_loop_arg(main_loop, &engine, 0, 1);
 #else

@@ -40,7 +40,7 @@ resource_manager::resource_manager(nlohmann::json& config, sol::state& lua) :
     }),
     music_cache([&](const std::string& name) {
         auto wav = std::make_shared<SoLoud::Wav>();
-        wav->load(("data/sound/sfx/" + name + ".ogg").c_str());
+        wav->load(("data/sound/music/" + name + ".ogg").c_str());
         wav->setLooping(1);
         wav->setVolume(config["volume"]);
         return wav;

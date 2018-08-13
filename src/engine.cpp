@@ -68,7 +68,7 @@ ld42_engine::ld42_engine() {
 
     std::cout << "Opening window..." << std::endl;
 
-    g_window = SDL_CreateWindow("LD41", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, display_width, display_height, SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
+    g_window = SDL_CreateWindow("LD42 - Tetromatcher", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, display_width, display_height, SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
 
     std::cout << "Setting window attributes..." << std::endl;
 
@@ -151,13 +151,24 @@ ld42_engine::ld42_engine() {
 
     {
         auto restart_stamp = std::make_shared<gui::label>();
-        restart_stamp->set_position({-9, 8});
+        restart_stamp->set_position({240, 24});
         restart_stamp->set_font("LiberationSans-Regular");
         restart_stamp->set_size(renderer, 8);
-        restart_stamp->set_text(renderer, "Press R to restart");
+        restart_stamp->set_text(renderer, "R to restart");
         restart_stamp->set_color({1, 1, 1, 1});
         restart_stamp->show();
         root_widget->add_child(restart_stamp);
+    }
+
+    {
+        auto music_stamp = std::make_shared<gui::label>();
+        music_stamp->set_position({240, 8});
+        music_stamp->set_font("LiberationSans-Regular");
+        music_stamp->set_size(renderer, 8);
+        music_stamp->set_text(renderer, "M to toggle music");
+        music_stamp->set_color({1, 1, 1, 1});
+        music_stamp->show();
+        root_widget->add_child(music_stamp);
     }
 
     {
@@ -202,6 +213,8 @@ ld42_engine::ld42_engine() {
     fade_dir = 1.0;
 
     rng = std::mt19937(std::random_device{}());
+
+    music_on = false;
 }
 
 ld42_engine::~ld42_engine() {
@@ -246,6 +259,14 @@ void ld42_engine::step(const std::function<void(ld42_engine& engine, double delt
         update_input(delta, "rotate_cw", keys[SDL_SCANCODE_X] | keys[SDL_SCANCODE_F] | keys[SDL_SCANCODE_SPACE]);
         update_input(delta, "rotate_ccw", keys[SDL_SCANCODE_Z] | keys[SDL_SCANCODE_W] | keys[SDL_SCANCODE_Y] | keys[SDL_SCANCODE_Q]);
         update_input(delta, "restart", keys[SDL_SCANCODE_R]);
+        update_input(delta, "music", keys[SDL_SCANCODE_M]);
+    }
+
+    // Music
+    {
+        if (input_table["music_pressed"]) {
+            toggle_music("bgm");
+        }
     }
 
     // Fade
@@ -348,6 +369,15 @@ void ld42_engine::play_music(const std::string& name) {
     auto wav_ptr = resources.music_cache.get(name);
     soloud.stopAudioSource(*wav_ptr);
     soloud.play(*wav_ptr);
+}
+
+void ld42_engine::toggle_music(const std::string& name) {
+    music_on = !music_on;
+    auto wav_ptr = resources.music_cache.get(name);
+    soloud.stopAudioSource(*wav_ptr);
+    if (music_on) {
+        soloud.play(*wav_ptr);
+    }
 }
 
 ember_database::ent_id ld42_engine::entity_from_json(const nlohmann::json& json) {

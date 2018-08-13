@@ -23,7 +23,7 @@ if(EMSCRIPTEN)
     option(LD42_USE_WASM "Use WASM" ON)
     set(LD42_WWW_DIR "${CMAKE_BINARY_DIR}/www" CACHE PATH "Client output directory")
     set(LD42_CLIENT_STATIC_DIR "${CMAKE_SOURCE_DIR}/static" CACHE PATH "Client static directory")
-    set(LD42_TOTAL_MEMORY "134217728" CACHE STRING "Total memory to allocate in the browser")
+    set(LD42_TOTAL_MEMORY "268435456" CACHE STRING "Total memory to allocate in the browser")
 
     find_package(PythonInterp 2 REQUIRED)
 
@@ -130,7 +130,8 @@ else()
     set_target_properties(ld42_client PROPERTIES
         CXX_STANDARD ${LD42_CXX_STANDARD}
         LINK_FLAGS "-static"
-        RUNTIME_OUTPUT_DIRECTORY "${LD42_DIST_DIR}")
+        RUNTIME_OUTPUT_DIRECTORY "${LD42_DIST_DIR}"
+        OUTPUT_NAME "ld42_tetromatcher")
     target_compile_definitions(ld42_client PUBLIC
         GLM_ENABLE_EXPERIMENTAL
         SOL_CHECK_ARGUMENTS

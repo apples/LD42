@@ -38,6 +38,7 @@ public:
 
     void play_sfx(const std::string& name);
     void play_music(const std::string& name);
+    void toggle_music(const std::string& name);
     ember_database::ent_id entity_from_json(const nlohmann::json& json);
 
     void update_input(double delta, const std::string& name, bool keystate);
@@ -80,6 +81,7 @@ public:
     int score;
     int combo;
     int lines_cleared;
+    bool music_on;
 };
 
 #endif // LD42_ENGINE_HPP
