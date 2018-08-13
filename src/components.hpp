@@ -136,6 +136,19 @@ struct block {
 REGISTER(block,
          MEMBER(color))
 
+struct particle {
+    glm::vec2 accel;
+    float angle;
+    float spin;
+    int color;
+};
+
+REGISTER(particle,
+         MEMBER(accel),
+         MEMBER(angle),
+         MEMBER(spin),
+         MEMBER(color))
+
 } //namespace component
 
 #undef MEMBER

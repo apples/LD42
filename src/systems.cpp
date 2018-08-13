@@ -168,10 +168,169 @@ void render(ld42_engine& engine, double delta) {
     engine.entities.visit([&](DB::ent_id eid, const component::position& pos, const component::block& block) {
         draw_block(glm::vec2(pos.x, pos.y), block.color);
     });
+
+    engine.entities.visit([&](DB::ent_id eid, const component::position& pos, component::velocity& vel, component::particle& particle) {
+        auto modelmat = glm::mat4(1);
+        modelmat = glm::translate(modelmat, glm::vec3(pos.x, pos.y, 0.f));
+        modelmat = glm::rotate(modelmat, particle.angle, glm::vec3(0.f, 0.f, 1.f));
+        modelmat = glm::scale(modelmat, glm::vec3(0.5f, 0.5f, 0.5f));
+        auto tint = glm::vec4{1, 1, 1, 1};
+
+        sushi::set_texture(0, *engine.resources.texture_cache.get("block_"s + std::to_string(particle.color)));
+        sushi::set_uniform("normal_mat", glm::inverseTranspose(view * modelmat));
+        sushi::set_uniform("MVP", (proj * view * modelmat));
+        sushi::set_uniform("tint", tint);
+        sushi::draw_mesh(engine.sprite_mesh);
+
+        vel.vx += particle.accel.x * delta;
+        vel.vy += particle.accel.y * delta;
+        particle.angle += particle.spin * delta;
+
+        if (pos.y < -1.f) {
+            engine.entities.destroy_entity(eid);
+        }
+    });
 }
 
 void board_tick(ld42_engine& engine, double delta) {
+    auto break_block = [&](ember_database::net_id nid) {
+        auto eid = engine.entities.get_entity(nid);
+        const auto& pos = engine.entities.get_component<component::position>(eid);
+        const auto& block = engine.entities.get_component<component::block>(eid);
+
+        auto spawn_particle = [&](const component::velocity& vel) {
+            auto particle = engine.entities.create_entity();
+            engine.entities.create_component(particle, component::position{pos});
+            engine.entities.create_component(particle, component::velocity{vel});
+            engine.entities.create_component(particle, component::particle{
+                {0.f, -15.f},
+                0.f,
+                3.f,
+                block.color
+            });
+        };
+
+        spawn_particle({-3.f, 3.f});
+        spawn_particle({-3.f, -3.f});
+        spawn_particle({3.f, -3.f});
+        spawn_particle({3.f, 3.f});
+
+        engine.entities.destroy_entity(eid);
+    };
+
+
     engine.entities.visit([&](component::board& board) {
+        auto check_matches = [&] {
+            bool lines_broke = false;
+
+            // Clear lines
+
+            for (int y = 21; y >= 0; --y) {
+                if (std::all_of(begin(board.grid[y]), end(board.grid[y]), [](auto& x) { return bool(x); })) {
+                    lines_broke = true;
+                    for (auto& nid : board.grid[y]) {
+                        break_block(*nid);
+                        nid = std::nullopt;
+                    }
+                    for (int oy = y + 1; oy < 22; ++oy) {
+                        for (auto& nid : board.grid[oy]) {
+                            if (nid) {
+                                auto& pos = engine.entities.get_component<component::position>(engine.entities.get_entity(*nid));
+                                pos.y -= 1;
+                            }
+                        }
+                        board.grid[oy - 1] = std::move(board.grid[oy]);
+                    }
+                    board.grid[21] = {};
+                }
+            }
+
+            // Clear color groups
+
+            if (!lines_broke) {
+                struct cell_info {
+                    cell_info* root = nullptr;
+                    int group_size = 1;
+                };
+
+                auto find_root = [](cell_info* cell) {
+                    auto root = cell;
+                    while (root->root) {
+                        root = root->root;
+                    }
+                    if (root != cell) {
+                        cell->root = root;
+                    }
+                    return root;
+                };
+
+                auto join_sets = [&find_root](cell_info* a, cell_info* b) {
+                    a = find_root(a);
+                    b = find_root(b);
+
+                    if (a != b) {
+                        if (b->group_size < a->group_size) {
+                            std::swap(a, b);
+                        }
+                        a->root = b;
+                        b->group_size += a->group_size;
+                    }
+                };
+
+                std::array<std::array<cell_info, 10>, 22> cells;
+
+                // Group em
+                for (int y = 0; y < 22; ++y) {
+                    for (int x = 0; x < 10; ++x) {
+                        if (board.grid[y][x]) {
+                            const auto& block = engine.entities.get_component<component::block>(engine.entities.get_entity(*board.grid[y][x]));
+                            if (block.color != 0) {
+                                if (y < 21 && board.grid[y + 1][x]) {
+                                    const auto& other_block = engine.entities.get_component<component::block>(engine.entities.get_entity(*board.grid[y + 1][x]));
+                                    if (other_block.color == block.color) {
+                                        join_sets(&cells[y][x], &cells[y + 1][x]);
+                                    }
+                                }
+                                if (x < 9 && board.grid[y][x + 1]) {
+                                    const auto& other_block = engine.entities.get_component<component::block>(engine.entities.get_entity(*board.grid[y][x + 1]));
+                                    if (other_block.color == block.color) {
+                                        join_sets(&cells[y][x], &cells[y][x + 1]);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Break em
+                for (int y = 21; y >= 0; --y) {
+                    for (int x = 0; x < 10; ++x) {
+                        if (find_root(&cells[y][x])->group_size >= 3) {
+                            lines_broke = true;
+                            break_block(*board.grid[y][x]);
+                            for (int oy = y + 1; oy < 22; ++oy) {
+                                if (board.grid[oy][x]) {
+                                    auto& pos = engine.entities.get_component<component::position>(engine.entities.get_entity(*board.grid[oy][x]));
+                                    pos.y -= 1;
+                                }
+                                board.grid[oy - 1][x] = std::move(board.grid[oy][x]);
+                            }
+                            board.grid[21][x] = std::nullopt;
+                        }
+                    }
+                }
+            }
+
+            return lines_broke;
+        };
+
+        auto spawn_next = [&] {
+            auto active = engine.entities.create_entity();
+            engine.entities.create_component(active, component::position{4, 19});
+            engine.entities.create_component(active, get_random_shape(engine.rng, engine.bag));
+            board.active = engine.entities.get_component<component::net_id>(active).id;
+        };
+
         if (board.active) {
             auto active = engine.entities.get_entity(*board.active);
             auto& pos = engine.entities.get_component<component::position>(active);
@@ -248,117 +407,24 @@ void board_tick(ld42_engine& engine, double delta) {
                     }
                     engine.entities.destroy_entity(active);
 
-                    // Clear lines
+                    board.active = std::nullopt;
 
-                    for (int y = 21; y >= 0; --y) {
-                        if (std::all_of(begin(board.grid[y]), end(board.grid[y]), [](auto& x) { return bool(x); })) {
-                            for (auto& nid : board.grid[y]) {
-                                engine.entities.destroy_entity(engine.entities.get_entity(*nid));
-                                nid = std::nullopt;
-                            }
-                            for (int oy = y + 1; oy < 22; ++oy) {
-                                for (auto& nid : board.grid[oy]) {
-                                    if (nid) {
-                                        auto& pos = engine.entities.get_component<component::position>(engine.entities.get_entity(*nid));
-                                        pos.y -= 1;
-                                    }
-                                }
-                                board.grid[oy - 1] = std::move(board.grid[oy]);
-                            }
-                            board.grid[21] = {};
-                        }
+                    if (!check_matches()) {
+                        spawn_next();
                     }
 
-                    // Clear color groups
-
-                    {
-                        struct cell_info {
-                            cell_info* root = nullptr;
-                            int group_size = 0;
-                            int color = 0;
-                        };
-                        std::array<std::array<cell_info, 10>, 22> cells;
-                        for (int y = 0; y < 22; ++y) {
-                            cell_info* cur_root = nullptr;
-                            for (int x = 0; x < 10; ++x) {
-                                if (board.grid[y][x]) {
-                                    auto& block = engine.entities.get_component<component::block>(engine.entities.get_entity(*board.grid[y][x]));
-                                    if (block.color != 0) {
-                                        cells[y][x].color = block.color;
-                                        if (cur_root && block.color == cur_root->color) {
-                                            cells[y][x].root = cur_root;
-                                            ++cur_root->group_size;
-                                        } else {
-                                            cur_root = &cells[y][x];
-                                            ++cur_root->group_size;
-                                            cur_root->color = block.color;
-                                        }
-                                    } else {
-                                        cur_root = nullptr;
-                                    }
-                                } else {
-                                    cur_root = nullptr;
-                                }
-                            }
-                        }
-                        for (int x = 0; x < 10; ++x) {
-                            cell_info* cur_root = nullptr;
-                            for (int y = 0; y < 22; ++y) {
-                                if (board.grid[y][x]) {
-                                    auto& block = engine.entities.get_component<component::block>(engine.entities.get_entity(*board.grid[y][x]));
-                                    if (block.color != 0) {
-                                        cells[y][x].color = block.color;
-                                        if (cur_root && block.color == cur_root->color) {
-                                                for (auto& row : cells) {
-                                                    for (auto& cell : row) {
-                                                        if (cell.root == &cells[y][x]) {
-                                                            cell.root = cur_root;
-                                                            cell.group_size = 0;
-                                                            ++cur_root->group_size;
-                                                        }
-                                                    }
-                                                }
-                                            cells[y][x].root = cur_root;
-                                            ++cur_root->group_size;
-                                        } else {
-                                            cur_root = &cells[y][x];
-                                            while (cur_root->root) {
-                                                cur_root = cur_root->root;
-                                            }
-                                        }
-                                    } else {
-                                        cur_root = nullptr;
-                                    }
-                                } else {
-                                    cur_root = nullptr;
-                                }
-                            }
-                        }
-                        for (int y = 21; y >= 0; --y) {
-                            for (int x = 0; x < 10; ++x) {
-                                if (cells[y][x].group_size >= 3 || cells[y][x].root && cells[y][x].root->group_size >= 3) {
-                                    engine.entities.destroy_entity(engine.entities.get_entity(*board.grid[y][x]));
-                                    for (int oy = y + 1; oy < 22; ++oy) {
-                                        if (board.grid[oy][x]) {
-                                            auto& pos = engine.entities.get_component<component::position>(engine.entities.get_entity(*board.grid[oy][x]));
-                                            pos.y -= 1;
-                                        }
-                                        board.grid[oy - 1][x] = std::move(board.grid[oy][x]);
-                                    }
-                                    board.grid[21][x] = std::nullopt;
-                                }
-                            }
-                        }
-                    }
-
-                    // Spawn next piece
-
-                    active = engine.entities.create_entity();
-                    engine.entities.create_component(active, component::position{4, 19});
-                    engine.entities.create_component(active, get_random_shape(engine.rng, engine.bag));
-                    board.active = engine.entities.get_component<component::net_id>(active).id;
                 } else {
                     pos.y -= 1;
+                }
+            }
+        } else {
+            board.next_tick -= delta;
+
+            // Chains
+            if (board.next_tick <= 0.0) {
+                board.next_tick += 0.25;
+                if (!check_matches()) {
+                    spawn_next();
                 }
             }
         }
