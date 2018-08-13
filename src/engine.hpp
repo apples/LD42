@@ -68,11 +68,14 @@ public:
     sushi_renderer renderer;
     gui::screen gui_screen;
     std::shared_ptr<gui::screen> root_widget;
+    std::shared_ptr<gui::label> score_stamp;
     std::shared_ptr<gui::label> framerate_stamp;
     double fade;
     double fade_dir;
     std::mt19937 rng;
     std::vector<component::shape> bag;
+    int score;
+    int combo;
 };
 
 #endif // LD42_ENGINE_HPP

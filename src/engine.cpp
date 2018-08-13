@@ -131,6 +131,14 @@ ld42_engine::ld42_engine() {
     root_widget->show();
     gui_screen.add_child(root_widget);
 
+    score_stamp = std::make_shared<gui::label>();
+    score_stamp->set_position({0,-1});
+    score_stamp->set_font("LiberationSans-Regular");
+    score_stamp->set_size(renderer, 12);
+    score_stamp->set_text(renderer, "Score: 0");
+    score_stamp->set_color({1,1,1,1});
+    root_widget->add_child(score_stamp);
+
     auto debug_root = std::make_shared<gui::screen>(glm::vec2{320, 240});
     debug_root->show();
     gui_screen.add_child(debug_root);
@@ -200,6 +208,9 @@ void ld42_engine::step(const std::function<void(ld42_engine& engine, double delt
     {
         fade = std::clamp(float(fade + delta * fade_dir), 0.f, 1.f);
     }
+
+    score_stamp->set_text(renderer, "Score: " + std::to_string(score));
+    score_stamp->hide();
 
     // Draw scene
     {

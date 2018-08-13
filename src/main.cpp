@@ -119,6 +119,9 @@ int main(int argc, char* argv[]) try {
                 engine.entities.get_component<component::net_id>(active).id
             });
         }
+
+        engine.score = 0;
+        engine.combo = 0;
         
         set_game_state("gameplay");
     });

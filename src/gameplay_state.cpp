@@ -11,4 +11,6 @@ void gameplay_state(ld42_engine& engine, double delta) {
     systems::death_timer(engine, delta);
     systems::render(engine, delta);
     systems::board_tick(engine, delta);
+
+    engine.score_stamp->show();
 }

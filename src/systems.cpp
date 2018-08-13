@@ -221,13 +221,13 @@ void board_tick(ld42_engine& engine, double delta) {
 
     engine.entities.visit([&](component::board& board) {
         auto check_matches = [&] {
-            bool lines_broke = false;
+            int score = 0;
 
             // Clear lines
 
             for (int y = 21; y >= 0; --y) {
                 if (std::all_of(begin(board.grid[y]), end(board.grid[y]), [](auto& x) { return bool(x); })) {
-                    lines_broke = true;
+                    score += 100;
                     for (auto& nid : board.grid[y]) {
                         break_block(*nid);
                         nid = std::nullopt;
@@ -247,10 +247,11 @@ void board_tick(ld42_engine& engine, double delta) {
 
             // Clear color groups
 
-            if (!lines_broke) {
+            if (score == 0) {
                 struct cell_info {
                     cell_info* root = nullptr;
                     int group_size = 1;
+                    bool seen = false;
                 };
 
                 auto find_root = [](cell_info* cell) {
@@ -305,8 +306,13 @@ void board_tick(ld42_engine& engine, double delta) {
                 // Break em
                 for (int y = 21; y >= 0; --y) {
                     for (int x = 0; x < 10; ++x) {
-                        if (find_root(&cells[y][x])->group_size >= 3) {
-                            lines_broke = true;
+                        auto root = find_root(&cells[y][x]);
+                        if (root->group_size >= 4) {
+                            if (!root->seen) {
+                                constexpr auto score_base_multiplier = 4;
+                                score += score_base_multiplier * root->group_size * (root->group_size + 1) / 2;
+                                root->seen = true;
+                            }
                             break_block(*board.grid[y][x]);
                             for (int oy = y + 1; oy < 22; ++oy) {
                                 if (board.grid[oy][x]) {
@@ -321,7 +327,7 @@ void board_tick(ld42_engine& engine, double delta) {
                 }
             }
 
-            return lines_broke;
+            return score;
         };
 
         auto spawn_next = [&] {
@@ -409,11 +415,14 @@ void board_tick(ld42_engine& engine, double delta) {
 
                     board.active = std::nullopt;
 
-                    if (check_matches()) {
+                    if (auto score = check_matches(); score > 0) {
                         engine.play_sfx("break");
+                        ++engine.combo;
+                        engine.score += score * engine.combo;
                     } else {
                         engine.play_sfx("placement");
                         spawn_next();
+                        engine.combo = 0;
                     }
                 } else {
                     pos.y -= 1;
@@ -425,10 +434,13 @@ void board_tick(ld42_engine& engine, double delta) {
             // Chains
             if (board.next_tick <= 0.0) {
                 board.next_tick += 0.25;
-                if (check_matches()) {
+                if (auto score = check_matches(); score > 0) {
                     engine.play_sfx("break");
+                    ++engine.combo;
+                    engine.score += score * engine.combo;
                 } else {
                     spawn_next();
+                    engine.combo = 0;
                 }
             }
         }
