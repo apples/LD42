@@ -409,10 +409,12 @@ void board_tick(ld42_engine& engine, double delta) {
 
                     board.active = std::nullopt;
 
-                    if (!check_matches()) {
+                    if (check_matches()) {
+                        engine.play_sfx("break");
+                    } else {
+                        engine.play_sfx("placement");
                         spawn_next();
                     }
-
                 } else {
                     pos.y -= 1;
                 }
@@ -423,7 +425,9 @@ void board_tick(ld42_engine& engine, double delta) {
             // Chains
             if (board.next_tick <= 0.0) {
                 board.next_tick += 0.25;
-                if (!check_matches()) {
+                if (check_matches()) {
+                    engine.play_sfx("break");
+                } else {
                     spawn_next();
                 }
             }
