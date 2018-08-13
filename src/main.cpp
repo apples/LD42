@@ -55,11 +55,12 @@ int main(int argc, char* argv[]) try {
     std::function<void(ld42_engine&, double)> game_over_loop;
     std::function<void(ld42_engine&, double)> win_loop;
 
-    auto set_game_state = [&](const std::string& name) {
+    std::function<void(const std::string&)> set_game_state;
+    set_game_state = [&](const std::string& name) {
         if (name == "main_menu")
             loop = main_menu_loop;
         else if (name == "gameplay")
-            loop = gameplay_state;
+            loop = gameplay_state(set_game_state);
         else if (name == "game_over")
             loop = game_over_loop;
         else if (name == "win")

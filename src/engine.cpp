@@ -128,7 +128,7 @@ ld42_engine::ld42_engine() {
     gui_screen.show();
 
     root_widget = std::make_shared<gui::screen>(glm::vec2{320, 240});
-    root_widget->show();
+    root_widget->hide();
     gui_screen.add_child(root_widget);
 
     score_stamp = std::make_shared<gui::label>();
@@ -137,7 +137,37 @@ ld42_engine::ld42_engine() {
     score_stamp->set_size(renderer, 12);
     score_stamp->set_text(renderer, "Score: 0");
     score_stamp->set_color({1,1,1,1});
+    score_stamp->show();
     root_widget->add_child(score_stamp);
+
+    {
+        auto restart_stamp = std::make_shared<gui::label>();
+        restart_stamp->set_position({-9, 8});
+        restart_stamp->set_font("LiberationSans-Regular");
+        restart_stamp->set_size(renderer, 8);
+        restart_stamp->set_text(renderer, "Press R to restart");
+        restart_stamp->set_color({1, 1, 1, 1});
+        restart_stamp->show();
+        root_widget->add_child(restart_stamp);
+    }
+
+    {
+        auto panel = std::make_shared<gui::panel>();
+        panel->set_texture("white");
+        panel->set_size({2, 480});
+        panel->set_position({88, 0});
+        panel->show();
+        root_widget->add_child(panel);
+    }
+
+    {
+        auto panel = std::make_shared<gui::panel>();
+        panel->set_texture("white");
+        panel->set_size({2, 480});
+        panel->set_position({210, 0});
+        panel->show();
+        root_widget->add_child(panel);
+    }
 
     auto debug_root = std::make_shared<gui::screen>(glm::vec2{320, 240});
     debug_root->show();
@@ -204,6 +234,7 @@ void ld42_engine::step(const std::function<void(ld42_engine& engine, double delt
         update_input(delta, "shoot", keys[SDL_SCANCODE_SPACE]);
         update_input(delta, "rotate_cw", keys[SDL_SCANCODE_X] | keys[SDL_SCANCODE_F] | keys[SDL_SCANCODE_SPACE]);
         update_input(delta, "rotate_ccw", keys[SDL_SCANCODE_Z] | keys[SDL_SCANCODE_W] | keys[SDL_SCANCODE_Y] | keys[SDL_SCANCODE_Q]);
+        update_input(delta, "restart", keys[SDL_SCANCODE_R]);
     }
 
     // Fade
@@ -212,7 +243,7 @@ void ld42_engine::step(const std::function<void(ld42_engine& engine, double delt
     }
 
     score_stamp->set_text(renderer, "Score: " + std::to_string(score));
-    score_stamp->hide();
+    root_widget->hide();
 
     // Draw scene
     {
@@ -325,11 +356,13 @@ void ld42_engine::update_input(double delta, const std::string& name, bool keyst
         if (curr) {
             auto timer = input_table.get_or(name + "_repeat_timer", 0.0);
             timer -= delta;
-            if (timer < 0.0) {
+            if (timer <= 0.0) {
                 timer += 0.1;
                 input_table[name + "_repeat"] = true;
             }
             input_table[name + "_repeat_timer"] = timer;
+        } else {
+            input_table[name + "_repeat_timer"] = 0.0;
         }
     } else {
         input_table[name] = bool(keystate);

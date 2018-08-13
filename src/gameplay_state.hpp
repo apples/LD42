@@ -3,6 +3,8 @@
 
 #include "engine.hpp"
 
-void gameplay_state(ld42_engine& engine, double delta);
+#include <functional>
+
+auto gameplay_state(std::function<void(const std::string&)> set_state) -> std::function<void(ld42_engine&, double)>;
 
 #endif // LD42_GAMEPLAY_STATE

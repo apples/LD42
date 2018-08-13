@@ -219,7 +219,7 @@ void board_tick(ld42_engine& engine, double delta) {
     };
 
 
-    engine.entities.visit([&](component::board& board) {
+    engine.entities.visit([&](ember_database::ent_id eid, component::board& board) {
         auto check_matches = [&] {
             int score = 0;
 
@@ -331,10 +331,22 @@ void board_tick(ld42_engine& engine, double delta) {
         };
 
         auto spawn_next = [&] {
+            auto shape = get_random_shape(engine.rng, engine.bag);
             auto active = engine.entities.create_entity();
             engine.entities.create_component(active, component::position{4, 19});
-            engine.entities.create_component(active, get_random_shape(engine.rng, engine.bag));
+            engine.entities.create_component(active, shape);
             board.active = engine.entities.get_component<component::net_id>(active).id;
+
+            for (int i = 0; i < 4; ++i) {
+                auto x = 4 + shape.pieces[i].x;
+                auto y = 19 + shape.pieces[i].y;
+
+                if (board.grid[y][x]) {
+                    return false;
+                }
+            }
+
+            return true;
         };
 
         if (board.active) {
@@ -430,7 +442,9 @@ void board_tick(ld42_engine& engine, double delta) {
                         engine.score += score * engine.combo;
                     } else {
                         engine.play_sfx("placement");
-                        spawn_next();
+                        if (!spawn_next()) {
+                            engine.entities.destroy_entity(eid);
+                        }
                         engine.combo = 0;
                     }
                 } else {
@@ -448,7 +462,9 @@ void board_tick(ld42_engine& engine, double delta) {
                     ++engine.combo;
                     engine.score += score * engine.combo;
                 } else {
-                    spawn_next();
+                    if (!spawn_next()) {
+                        engine.entities.destroy_entity(eid);
+                    }
                     engine.combo = 0;
                 }
             }
