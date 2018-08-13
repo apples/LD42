@@ -179,7 +179,9 @@ ld42_engine::ld42_engine() {
     }
 
     auto debug_root = std::make_shared<gui::screen>(glm::vec2{320, 240});
+#ifndef NDEBUG
     debug_root->show();
+#endif
     gui_screen.add_child(debug_root);
 
     framerate_stamp = std::make_shared<gui::label>();

@@ -15,6 +15,7 @@
 #include <array>
 #include <memory>
 #include <chrono>
+#include <optional>
 
 #define REGISTER(NAME, ...)                                           \
         }                                                             \

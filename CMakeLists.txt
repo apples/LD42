@@ -23,7 +23,7 @@ if(EMSCRIPTEN)
     option(LD42_USE_WASM "Use WASM" ON)
     set(LD42_WWW_DIR "${CMAKE_BINARY_DIR}/www" CACHE PATH "Client output directory")
     set(LD42_CLIENT_STATIC_DIR "${CMAKE_SOURCE_DIR}/static" CACHE PATH "Client static directory")
-    set(LD42_TOTAL_MEMORY "33554432" CACHE STRING "Total memory to allocate in the browser")
+    set(LD42_TOTAL_MEMORY "134217728" CACHE STRING "Total memory to allocate in the browser")
 
     find_package(PythonInterp 2 REQUIRED)
 
@@ -84,7 +84,6 @@ if(EMSCRIPTEN)
         " --cpuprofiler"
         " --memoryprofiler")
     set_target_properties(ld42_client PROPERTIES
-        CXX_STANDARD ${LD42_CXX_STANDARD}
         SUFFIX .js
         LINK_FLAGS "${LD42_CLIENT_LINK_FLAGS}"
         LINK_FLAGS_DEBUG "${LD42_CLIENT_LINK_FLAGS_DEBUG}"
@@ -93,6 +92,8 @@ if(EMSCRIPTEN)
     target_compile_definitions(ld42_client PUBLIC
         SOL_CHECK_ARGUMENTS
         SOL_PRINT_ERRORS)
+    target_compile_options(ld42_client PRIVATE
+        "-std=c++1z")
     em_link_js_library(ld42_client ${LD42_CLIENT_JS})
     target_link_libraries(ld42_client
         ginseng
