@@ -197,11 +197,13 @@ void ld42_engine::step(const std::function<void(ld42_engine& engine, double delt
     {
         const Uint8* keys = SDL_GetKeyboardState(nullptr);
 
-        update_input("left", keys[SDL_SCANCODE_LEFT]);
-        update_input("right", keys[SDL_SCANCODE_RIGHT]);
-        update_input("up", keys[SDL_SCANCODE_UP]);
-        update_input("down", keys[SDL_SCANCODE_DOWN]);
-        update_input("shoot", keys[SDL_SCANCODE_SPACE]);
+        update_input(delta, "left", keys[SDL_SCANCODE_LEFT]);
+        update_input(delta, "right", keys[SDL_SCANCODE_RIGHT]);
+        update_input(delta, "up", keys[SDL_SCANCODE_UP]);
+        update_input(delta, "down", keys[SDL_SCANCODE_DOWN]);
+        update_input(delta, "shoot", keys[SDL_SCANCODE_SPACE]);
+        update_input(delta, "rotate_cw", keys[SDL_SCANCODE_X] | keys[SDL_SCANCODE_F] | keys[SDL_SCANCODE_SPACE]);
+        update_input(delta, "rotate_ccw", keys[SDL_SCANCODE_Z] | keys[SDL_SCANCODE_W] | keys[SDL_SCANCODE_Y] | keys[SDL_SCANCODE_Q]);
     }
 
     // Fade
@@ -311,17 +313,30 @@ ember_database::ent_id ld42_engine::entity_from_json(const nlohmann::json& json)
     return loader["load_entity"](json).get<ember_database::ent_id>();
 }
 
-void ld42_engine::update_input(const std::string& name, bool keystate) {
+void ld42_engine::update_input(double delta, const std::string& name, bool keystate) {
     if (input_table[name].valid()) {
         auto prev = bool(input_table[name]);
         auto curr = bool(keystate);
         input_table[name] = curr;
         input_table[name + "_pressed"] = curr && !prev;
         input_table[name + "_released"] = !curr && prev;
+        input_table[name + "_repeat"] = false;
+
+        if (curr) {
+            auto timer = input_table.get_or(name + "_repeat_timer", 0.0);
+            timer -= delta;
+            if (timer < 0.0) {
+                timer += 0.1;
+                input_table[name + "_repeat"] = true;
+            }
+            input_table[name + "_repeat_timer"] = timer;
+        }
     } else {
         input_table[name] = bool(keystate);
         input_table[name + "_pressed"] = bool(keystate);
         input_table[name + "_released"] = false;
+        input_table[name + "_repeat"] = false;
+        input_table[name + "_repeat_timer"] = 0.0;
     }
 }
 

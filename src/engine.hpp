@@ -40,7 +40,7 @@ public:
     void play_music(const std::string& name);
     ember_database::ent_id entity_from_json(const nlohmann::json& json);
 
-    void update_input(const std::string& name, bool keystate);
+    void update_input(double delta, const std::string& name, bool keystate);
 
     void load_world(const nlohmann::json& json);
 

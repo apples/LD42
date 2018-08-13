@@ -355,18 +355,23 @@ void board_tick(ld42_engine& engine, double delta) {
                 return true;
             };
 
-            if (engine.input_table.get_or("left_pressed", false) && can_move(-1)) {
+            if (engine.input_table.get_or("left_repeat", false) && can_move(-1)) {
                 pos.x -= 1;
             }
 
-            if (engine.input_table.get_or("right_pressed", false) && can_move(1)) {
+            if (engine.input_table.get_or("right_repeat", false) && can_move(1)) {
                 pos.x += 1;
             }
 
             // Rotation
-            if (engine.input_table.get_or("up_pressed", false)) {
+            if (engine.input_table["rotate_cw_pressed"] || engine.input_table["rotate_ccw_pressed"]) {
                 auto new_shape = shape;
-                auto rotmat = glm::mat2({0.f, -1.f}, {1.f, 0.f});
+                glm::mat2 rotmat;
+                if (engine.input_table["rotate_cw_pressed"]) {
+                    rotmat = glm::mat2({0.f, -1.f}, {1.f, 0.f});
+                } else {
+                    rotmat = glm::mat2({0.f, 1.f}, {-1.f, 0.f});
+                }
                 for (int i=0; i<4; ++i) {
                     new_shape.pieces[i] = glm::ivec2(glm::round(rotmat * (glm::vec2(new_shape.pieces[i]) - new_shape.pivot) + new_shape.pivot));
                 }
@@ -383,6 +388,10 @@ void board_tick(ld42_engine& engine, double delta) {
                 if (is_good()) {
                     shape = new_shape;
                 }
+            }
+
+            // Hard drop
+            if (engine.input_table.get_or("up_pressed", false)) {
             }
 
             board.next_tick -= delta;
