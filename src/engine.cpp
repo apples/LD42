@@ -134,11 +134,20 @@ ld42_engine::ld42_engine() {
     score_stamp = std::make_shared<gui::label>();
     score_stamp->set_position({0,-1});
     score_stamp->set_font("LiberationSans-Regular");
-    score_stamp->set_size(renderer, 12);
+    score_stamp->set_size(renderer, 10);
     score_stamp->set_text(renderer, "Score: 0");
     score_stamp->set_color({1,1,1,1});
     score_stamp->show();
     root_widget->add_child(score_stamp);
+
+    lines_stamp = std::make_shared<gui::label>();
+    lines_stamp->set_position({0,-25});
+    lines_stamp->set_font("LiberationSans-Regular");
+    lines_stamp->set_size(renderer, 10);
+    lines_stamp->set_text(renderer, "Lines: 0");
+    lines_stamp->set_color({1,1,1,1});
+    lines_stamp->show();
+    root_widget->add_child(lines_stamp);
 
     {
         auto restart_stamp = std::make_shared<gui::label>();
@@ -243,6 +252,7 @@ void ld42_engine::step(const std::function<void(ld42_engine& engine, double delt
     }
 
     score_stamp->set_text(renderer, "Score: " + std::to_string(score));
+    lines_stamp->set_text(renderer, "Lines: " + std::to_string(lines_cleared));
     root_widget->hide();
 
     // Draw scene
@@ -380,4 +390,42 @@ void ld42_engine::load_world(const nlohmann::json& json) {
     auto& loader = *resources.environment_cache.get("system/loader");
     auto data = json.get<std::vector<std::unordered_map<std::string, nlohmann::json>>>();
     loader["load_world"](data);
+}
+
+double ld42_engine::get_tick_delay() {
+    auto level = lines_cleared / 10;
+    const int delay_table[30] = {
+        48,
+        43,
+        38,
+        33,
+        28,
+        23,
+        18,
+        13,
+        8,
+        6,
+        5,
+        5,
+        5,
+        4,
+        4,
+        4,
+        3,
+        3,
+        3,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        1
+    };
+
+    return delay_table[std::min(level, 29)] / 60.0;
 }

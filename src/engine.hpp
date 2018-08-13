@@ -44,6 +44,8 @@ public:
 
     void load_world(const nlohmann::json& json);
 
+    double get_tick_delay();
+
     using clock = std::chrono::steady_clock;
 
     bool running;
@@ -69,6 +71,7 @@ public:
     gui::screen gui_screen;
     std::shared_ptr<gui::screen> root_widget;
     std::shared_ptr<gui::label> score_stamp;
+    std::shared_ptr<gui::label> lines_stamp;
     std::shared_ptr<gui::label> framerate_stamp;
     double fade;
     double fade_dir;
@@ -76,6 +79,7 @@ public:
     std::vector<component::shape> bag;
     int score;
     int combo;
+    int lines_cleared;
 };
 
 #endif // LD42_ENGINE_HPP

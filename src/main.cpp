@@ -123,6 +123,7 @@ int main(int argc, char* argv[]) try {
 
         engine.score = 0;
         engine.combo = 0;
+        engine.lines_cleared = 0;
         
         set_game_state("gameplay");
     });

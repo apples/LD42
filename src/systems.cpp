@@ -225,9 +225,12 @@ void board_tick(ld42_engine& engine, double delta) {
 
             // Clear lines
 
+            int line_multiplier = 2;
             for (int y = 21; y >= 0; --y) {
                 if (std::all_of(begin(board.grid[y]), end(board.grid[y]), [](auto& x) { return bool(x); })) {
-                    score += 100;
+                    score += 50 * line_multiplier;
+                    ++line_multiplier;
+                    ++engine.lines_cleared;
                     for (auto& nid : board.grid[y]) {
                         break_block(*nid);
                         nid = std::nullopt;
@@ -309,9 +312,10 @@ void board_tick(ld42_engine& engine, double delta) {
                         auto root = find_root(&cells[y][x]);
                         if (root->group_size >= 4) {
                             if (!root->seen) {
-                                constexpr auto score_base_multiplier = 4;
+                                constexpr auto score_base_multiplier = 10;
                                 score += score_base_multiplier * root->group_size * (root->group_size + 1) / 2;
                                 root->seen = true;
+                                ++engine.lines_cleared;
                             }
                             break_block(*board.grid[y][x]);
                             for (int oy = y + 1; oy < 22; ++oy) {
@@ -408,12 +412,12 @@ void board_tick(ld42_engine& engine, double delta) {
 
             board.next_tick -= delta;
 
-            if (engine.input_table.get_or("down", false)) {
-                board.next_tick -= delta;
+            if (engine.input_table.get_or("down", false) && engine.get_tick_delay() - board.next_tick > 1.0/30.0) {
+                board.next_tick = 0.0;
             }
 
             if (board.next_tick <= 0.0) {
-                board.next_tick += 0.25;
+                board.next_tick = engine.get_tick_delay();
                 auto should_lock = [&] {
                     for (int i = 0; i < 4; ++i) {
                         if (pos.y + shape.pieces[i].y - 1 < 0 || board.grid[pos.y + shape.pieces[i].y - 1][pos.x + shape.pieces[i].x]) {
@@ -440,10 +444,12 @@ void board_tick(ld42_engine& engine, double delta) {
                         engine.play_sfx("break");
                         ++engine.combo;
                         engine.score += score * engine.combo;
+                        board.next_tick = 0.5;
                     } else {
                         engine.play_sfx("placement");
                         if (!spawn_next()) {
                             engine.entities.destroy_entity(eid);
+                            engine.play_sfx("death");
                         }
                         engine.combo = 0;
                     }
@@ -456,15 +462,17 @@ void board_tick(ld42_engine& engine, double delta) {
 
             // Chains
             if (board.next_tick <= 0.0) {
-                board.next_tick += 0.25;
                 if (auto score = check_matches(); score > 0) {
                     engine.play_sfx("break");
                     ++engine.combo;
                     engine.score += score * engine.combo;
+                    board.next_tick = 0.5;
                 } else {
                     if (!spawn_next()) {
                         engine.entities.destroy_entity(eid);
+                        engine.play_sfx("death");
                     }
+                    board.next_tick = engine.get_tick_delay();
                     engine.combo = 0;
                 }
             }
